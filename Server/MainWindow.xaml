@@ -4,9 +4,131 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Server"
+        xmlns:uc="clr-namespace:Contracts.UserControls;assembly=Contracts"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
         
+        Title="ServerWindow" 
+        
+        Closing="Window_Closing"
+        
+        Height="600" Width="1050">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1.7*"/>
+            <ColumnDefinition Width="1*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2*"/>
+            <RowDefinition Height="1.5*"/>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ListView x:Name="MetaDataLV"
+                  Grid.Column="0" Grid.Row="1" 
+                  Margin="10">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="ParticipantId" Width="110" DisplayMemberBinding="{Binding ParticipantId}"/>
+                    <GridViewColumn Header="DeviceId" Width="110" DisplayMemberBinding="{Binding DeviceId}"/>
+                    <GridViewColumn Header="SampleRateHz" Width="110" DisplayMemberBinding="{Binding SampleRateHz}"/>
+                    <GridViewColumn Header="TimestampOffsetMs" Width="110" DisplayMemberBinding="{Binding TimeStampOffsetMs}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <StackPanel Grid.Column="1" Grid.Row="1"
+                    Orientation="Vertical"
+                    Margin="10"
+                    HorizontalAlignment="Center" VerticalAlignment="Top">
+            <StackPanel>
+                <TextBlock Text="Rejected CSV's"
+                           FontSize="20" FontWeight="DemiBold"
+                           Margin="5"/>
+                <TextBox x:Name="RejectedCSVTB" 
+                         Width="250" Height="180" 
+                         Margin="5"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"/>
+            </StackPanel>
+
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Grid.Row="2"
+                    Orientation="Horizontal"
+                    Margin="10"
+                    HorizontalAlignment="Center">
+            <StackPanel>
+                <TextBlock Text="Events"
+                           FontSize="20" FontWeight="DemiBold"
+                           Margin="5"/>
+                <TextBox x:Name="EventsTB" 
+                         Width="250" Height="120" 
+                         Margin="5"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"/>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Column="0" Grid.Row="2"
+                    Orientation="Horizontal">
+            <GroupBox Header="Analytics"
+                      Margin="10"
+                      Width="400"
+                      FontSize="20" FontWeight="DemiBold"
+                      VerticalContentAlignment="Center">
+                <StackPanel x:Name="E4Panel" Orientation="Vertical"
+                            VerticalAlignment="Top" Margin="0 10 0 0">
+                    <uc:LabelProgressBar x:Name="HearthRate_PG" ProgessString="HR: " Margin="5"/>
+                    <uc:LabelProgressBar x:Name="IBI_PG"  ProgessString="IBI: "  Margin="5"/>
+                    <uc:LabelProgressBar x:Name="ANORM_PG"  ProgessString="ANM: "  Margin="5"/>
+                </StackPanel>
+            </GroupBox>
+            <StackPanel>
+                <TextBlock Text="Errors"
+                           FontSize="20" FontWeight="DemiBold"
+                           Margin="5"/>
+                <TextBox x:Name="ErrorsTB" 
+                         Width="225" Height="130" 
+                         Margin="5"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"/>
+            </StackPanel>
+
+        </StackPanel>
+
+        <StackPanel Grid.Column="0" Grid.Row="3"
+                    Margin="5">
+            <TextBlock Text="Incoming Rows"
+                           FontSize="20" FontWeight="DemiBold"
+                           Margin="5"/>
+            <TextBox x:Name="IncomingRowsTB" 
+                     IsReadOnly="True"
+                     Margin="5 0 0 0"
+                     Height="70"/>
+
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Grid.Row="4"
+                    Orientation="Horizontal"
+                    Margin="5"
+                    HorizontalAlignment="Right">
+            <TextBlock x:Name="ServerStatusTB"
+                       Text="ServerStatus" 
+                       VerticalAlignment="Center"
+                       Margin="0 0 5 0"/>
+            <Rectangle x:Name="ServerStatusIndicator" 
+                       Width="20" Height="20" 
+                       Fill="Red" 
+                       VerticalAlignment="Center" 
+                       RadiusX="50" RadiusY="50"
+                       Margin="5 0 15 0"/>
+            <Button x:Name="StartServerBTN"
+                    Click="StartServerBTN_Click"
+                    Content="Start"
+                    Width="50" Height="25" />
+        </StackPanel>
+
     </Grid>
 </Window>

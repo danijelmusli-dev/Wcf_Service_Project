@@ -20,6 +20,24 @@ namespace Contracts.UserControls
     /// </summary>
     public partial class LabelProgressBar : UserControl
     {
+        public string ProgessString
+        {
+            get { return (string)GetValue(LabelProperty); }
+            set { SetValue(LabelProperty, value); }
+        }
+
+        private static readonly DependencyProperty LabelProperty =
+            DependencyProperty.Register("ProgessString", typeof(string), typeof(LabelProgressBar), new PropertyMetadata(string.Empty));
+
+        public int ProgressValue
+        {
+            get { return (int)GetValue(ProgressValueProperty); }
+            set { SetValue(ProgressValueProperty, value); }
+        }
+
+        private static readonly DependencyProperty ProgressValueProperty =
+            DependencyProperty.Register("ProgressValue", typeof(int), typeof(LabelProgressBar), new PropertyMetadata(0));
+
         public LabelProgressBar()
         {
             InitializeComponent();

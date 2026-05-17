@@ -6,7 +6,34 @@
              xmlns:local="clr-namespace:Contracts.UserControls"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <Grid>
-            
+    <Grid Width="Auto" Height="Auto">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Text="{Binding ProgessString, RelativeSource={RelativeSource AncestorType=UserControl}}"
+               Grid.Column="0"
+               VerticalAlignment="Center"
+               Width="40"
+               Margin="0,0,10,0"
+               FontSize="15"
+               FontWeight="SemiBold"/>
+
+        <Grid Grid.Column="1">
+            <Border CornerRadius="5" ClipToBounds="True">
+                <ProgressBar x:Name="progressBar"
+                             Minimum="0" Maximum="{Binding ProgessValue, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                             Value="{Binding ProgessValue, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                             Height="20"
+                             Foreground="BlueViolet"/>
+            </Border>
+            <TextBlock Text="{Binding ElementName=progressBar, Path=Value}"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center"
+                   Margin="0 0 10 0"
+                   Foreground="Black"
+                   FontSize="15" FontWeight="Regular"/>
+        </Grid>
     </Grid>
 </UserControl>

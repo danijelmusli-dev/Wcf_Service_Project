@@ -20,6 +20,16 @@ namespace Contracts.UserControls
     /// </summary>
     public partial class DataDirectory : UserControl
     {
+        
+        private static readonly DependencyProperty DirectoryNameProperty =
+            DependencyProperty.Register("DirName", typeof(string), typeof(DataDirectory), new PropertyMetadata(string.Empty));
+
+        public string DirName
+        {
+            get { return (string)GetValue(DirectoryNameProperty); }
+            set { SetValue(DirectoryNameProperty, value); }
+        }
+
         public DataDirectory()
         {
             InitializeComponent();
