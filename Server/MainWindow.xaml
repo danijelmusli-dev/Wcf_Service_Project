@@ -11,7 +11,7 @@
         
         Closing="Window_Closing"
         
-        Height="600" Width="1050">
+        Height="620" Width="1050">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="1.7*"/>
@@ -89,11 +89,6 @@
                 <TextBlock Text="Errors"
                            FontSize="20" FontWeight="DemiBold"
                            Margin="5"/>
-                <TextBox x:Name="ErrorsTB" 
-                         Width="225" Height="130" 
-                         Margin="5"
-                         IsReadOnly="True"
-                         TextWrapping="Wrap"/>
             </StackPanel>
 
         </StackPanel>

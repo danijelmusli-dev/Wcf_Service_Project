@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Contracts.Models;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -33,5 +34,28 @@ namespace Contracts.Utils
                 sw.WriteLine(message);
             }
         }
+
+        public static void LogSamplesToRejectedClient(List<PpgSample> samples)
+        {
+            using (StreamWriter sw = new StreamWriter(_clientPath))
+            {
+                foreach (PpgSample sample in samples)
+                {
+                    sw.WriteLine(sample.ToString());
+                }
+            }
+        }
+
+        public static void LogSamplesToRejectedServer(List<PpgSample> samples)
+        {
+            using (StreamWriter sw = new StreamWriter(_serverPath))
+            {
+                foreach (PpgSample sample in samples)
+                {
+                    sw.WriteLine(sample.ToString());
+                }
+            }
+        }
+
     }
 }
