@@ -15,9 +15,11 @@ namespace Contracts.Services
         void StartSession(Meta error);
 
         [OperationContract]
-        bool PushSample(PpgSample sample);
+        [FaultContract(typeof(ValidationFault))]
+        [FaultContract(typeof(DataFormatFault))]
+        void PushSample(PpgSample sample);
 
         [OperationContract]
-        bool EndSession();
+        void EndSession();
     }
 }

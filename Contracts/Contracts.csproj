@@ -37,6 +37,7 @@
     <Reference Include="FontAwesome5.Net, Version=2.1.11.0, Culture=neutral, PublicKeyToken=9cfaf01297a008f8, processorArchitecture=MSIL">
       <HintPath>..\packages\FontAwesome5.2.1.11\lib\net472\FontAwesome5.Net.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Extensions.Configuration, Version=10.0.0.2, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
     <Reference Include="System" />
@@ -60,7 +61,6 @@
     <Compile Include="Models\PpgSample.cs" />
     <Compile Include="Models\ValidationFault.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Services\FaultContracts.cs" />
     <Compile Include="Services\IPpgService.cs" />
     <Compile Include="UserControls\DataDirectory.xaml.cs">
       <DependentUpon>DataDirectory.xaml</DependentUpon>

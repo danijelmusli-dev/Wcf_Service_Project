@@ -14,7 +14,7 @@ namespace Contracts.Models
         [DataMember] public string ParticipantId { get; set; }
         [DataMember] public string DeviceId { get; set; }
         [DataMember] public double SampleRateHz { get; set; }
-        [DataMember] public long TimestampOffsetMs { get; set; }
+        [DataMember] public long TimeStampOffsetMs { get; set; }
 
         public Meta(string participantId, string deviceId, PpgSample firstSample, PpgSample secondSample)
         {
@@ -22,7 +22,7 @@ namespace Contracts.Models
             this.DeviceId = deviceId;
 
             this.SampleRateHz = (1000 / (secondSample.TimestampMs - firstSample.TimestampMs));
-            this.TimestampOffsetMs = (secondSample.TimestampMs - firstSample.TimestampMs);
+            this.TimeStampOffsetMs = (secondSample.TimestampMs - firstSample.TimestampMs);
         }
 
     }
