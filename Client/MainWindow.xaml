@@ -50,7 +50,7 @@
                                FontSize="15" FontWeight="DemiBold"
                                Foreground="Red"
                                Margin="5 10 0 5"/>
-                <TextBox x:Name="RejectedRowsTB" 
+                <TextBox x:Name="ExceptionsTB" 
                              IsReadOnly="True"
                              Margin="5 0 5 0"
                              Height="100"

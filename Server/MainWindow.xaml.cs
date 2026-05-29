@@ -1,7 +1,9 @@
 ﻿using Contracts;
 using Contracts.Models;
 using Contracts.Utils;
+using Server.AnalyticHelpers;
 using System;
+using System.Threading;
 using System.Collections.Generic;
 using System.Linq;
 using System.ServiceModel;
@@ -27,20 +29,29 @@ namespace Server
         ServiceHost Host { get; set; } = null;
         SessionHandlingService _service;
         List<PpgSample> RejectedPpgSamples { get; set; } = new List<PpgSample>();
+        Analytics _analitic { get; set; }
 
+        PpgSample _currSample = new PpgSample();
+        PpgSample _prevSample = new PpgSample();
 
         public MainWindow()
         {
             InitializeComponent();
 
-
             this._service = new SessionHandlingService();
-            this.Host = new ServiceHost(this._service);
 
             this._service.TransferStarted += this.OnTransferStarted;
             this._service.SampleRecieved += this.OnSampleRecieved;
             this._service.OnTransferCompleted += this.OnTransferCompleted;
             this._service.OnWarningRaised += this.OnWarningRaised;
+
+            this._analitic = new Analytics();
+
+            this._analitic.HrOutOfRangeWarning += this.OnHrOutOfRangeWarning;
+            this._analitic.WeakPpgWarning += this.OnWeakPpgWarning;
+            this._analitic.ExcessiveMotionWarning += this.OnExcessiveMotionWarning;
+            this._analitic.IbiSpikeWarning += this.OnIbiSpikeWarning;
+            
         }
 
         private void StartServerBTN_Click(object sender, RoutedEventArgs e)
@@ -57,9 +68,9 @@ namespace Server
 
         private void StartServer()
         {
-
             try
             {
+                this.Host = new ServiceHost(this._service);
                 this.Host.Open();
 
                 this.StartServerBTN.Content = "Stop";
@@ -71,12 +82,9 @@ namespace Server
                 this.Host?.Abort();
                 this.Host = null;
             }
-
-
         }
         private void StopServer()
         {
-
             try
             {
                 if (this.Host != null)
@@ -98,42 +106,72 @@ namespace Server
                 this.Host?.Abort();
                 this.Host = null;
             }
-
         }
 
         private void OnTransferStarted(object sender, EventArgs e)
         {
-            // prikazati da je prenos krenuo
+            this.EventsTB.Text += "Transfer Started! \n";
+
+            if (sender is Meta)
+            { 
+                this.MetaDataLV.Items.Add(sender as Meta);
+            }
+                
         }
+
         private void OnSampleRecieved(object sender, EventArgs e)
         {
-            if (!PpgSampleValidator.ValidateSample(PpgSampleBase.PpgSamples.Last()))
+            if (sender is PpgSample sample)
             {
+                this._prevSample = this._currSample;
+                this._currSample = sample;
+            }
 
-            }
+            _analitic.AnalizePpgSample(this._prevSample, this._currSample);
         }
-        private async void OnTransferCompleted(object sender, EventArgs e)
+
+        private void OnTransferCompleted(object sender, EventArgs e)
         {
-            foreach (var sample in PpgSampleBase.PpgSamples)
-            {
-                this.IncomingRowsTB.Text += sample.ToString() + "\n";
-            }
+            this.StopServer();
+
+            this.EventsTB.Text += "Transfer Completed! \n";
+
         }
+
         private void OnWarningRaised(object sender, EventArgs e)
         {
-
+            
         }
-
-        private void WriteIncomingRows()
+        private void OnHrOutOfRangeWarning(object sender, PpgSample sample)
         {
-            foreach (var sample in PpgSampleBase.PpgSamples)
-            {
-                this.IncomingRowsTB.Text += sample.ToString() + "\n";
-            }
+            this._service.OnWarningRaised?.Invoke(sender, EventArgs.Empty);
+        }
+        private void OnIbiSpikeWarning(object sender, PpgSample sample)
+        {
+            this._service.OnWarningRaised?.Invoke(sender, EventArgs.Empty);
+        }
+        private void OnExcessiveMotionWarning(object sender, PpgSample sample)
+        {
+            this._service.OnWarningRaised?.Invoke(sender, EventArgs.Empty);
+        }
+        private void OnWeakPpgWarning(object sender, PpgSample sample)
+        {
+            this._service.OnWarningRaised?.Invoke(sender, EventArgs.Empty);
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+
+            this._service.TransferStarted -= this.OnTransferStarted;
+            this._service.SampleRecieved -= this.OnSampleRecieved;
+            this._service.OnTransferCompleted -= this.OnTransferCompleted;
+            this._service.OnWarningRaised -= this.OnWarningRaised;
+
+            this._analitic.HrOutOfRangeWarning -= this.OnHrOutOfRangeWarning;
+            this._analitic.WeakPpgWarning -= this.OnWeakPpgWarning;
+            this._analitic.ExcessiveMotionWarning -= this.OnExcessiveMotionWarning;
+            this._analitic.IbiSpikeWarning -= this.OnIbiSpikeWarning;
+
             if (this.Host != null)
             {
                 try

@@ -1,9 +1,15 @@
-﻿using System;
+﻿using Contracts;
+using Contracts.Models;
+using Contracts.Services;
+using Contracts.UserControls;
+using Contracts.Utils;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.ServiceModel;
+using System.ServiceModel.Description;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -12,15 +18,10 @@ using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-
-using Contracts;
-using Contracts.Models;
-using Contracts.Services;
-using Contracts.UserControls;
-using Contracts.Utils;
 
 namespace Wcf_Service_Project
 {
@@ -37,6 +38,7 @@ namespace Wcf_Service_Project
         List<PpgSample> PpgSamples { get; set; } = new List<PpgSample>();
         List<PpgSample> RejectedPpgSamples { get; set; } = new List<PpgSample>();
         string CurrentDirectoryName { get; set; } = string.Empty;
+        List<string> PreviousDirectories { get; set; } = new List<string>();
 
         private void DirectoriesSP_Loaded(object sender, RoutedEventArgs e)
         {
@@ -63,9 +65,10 @@ namespace Wcf_Service_Project
 
         private async void DataDirectory_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
+            if (this.IsSessionStarted) return;
 
             Stopwatch stopwatch = new Stopwatch();
-            if (!this.CurrentDirectoryName.Equals(((DataDirectory)sender).DirName))
+            if (!this.PreviousDirectories.Contains((sender as DataDirectory).DirName))
             {
                 stopwatch.Start();
                 this.PpgSamples.Clear();
@@ -87,7 +90,7 @@ namespace Wcf_Service_Project
             }
 
             // Session Started
-            this.SessionInfoTB.Text = (this.IsSessionStarted) ? "Session started" : "No session started.";
+            this.SessionInfoTB.Text = (this.IsSessionStarted) ? "Session started" : "Session Ended";
             this.SessionInfoTB.Foreground = (this.IsSessionStarted) ? Brushes.Green : Brushes.Red;
 
             // Rows Loaded
@@ -96,77 +99,110 @@ namespace Wcf_Service_Project
             // Loading Time
             this.LoadingTimeInfoTB.Text = $"Loading time: {stopwatch.Elapsed.TotalMilliseconds} ms";
 
-            // Rejected rows
-            this.RejectedPpgSamples.Clear();
-            this.RejectedPpgSamples = PpgSampleValidator.AllInValidSamples(this.PpgSamples);
-
-            PpgSampleValidator.RemoveAllInValidSamples(this.PpgSamples);
-
-            this.RejectedRowsTB.Text = string.Empty;
-            int range = (this.RejectedPpgSamples.Count >= 30) ? 30 : this.RejectedPpgSamples.Count;
-            foreach (var sample in this.RejectedPpgSamples.GetRange(0, range))
-            {
-                this.RejectedRowsTB.Text += sample.ToString() + '\n';
-            }
-            this.RejectedRowsTB.Text += "..........";
-
             // Loaded rows
             this.LoadedRowsTB.Text = string.Empty;
-            range = (this.PpgSamples.Count >= 30) ? 30 : this.PpgSamples.Count;
+            int range = (this.PpgSamples.Count >= 30) ? 30 : this.PpgSamples.Count;
             foreach (var sample in this.PpgSamples.GetRange(0, range))
             {
                 this.LoadedRowsTB.Text += sample.ToString() + '\n';
             }
             this.LoadedRowsTB.Text += "..........";
 
-
-            // Logging rejected rows
-            foreach (var sample in this.RejectedPpgSamples)
-            {
-                Logger.LogToRejectedClient(sample.ToString());
-            }
-
         }
 
-        private void StartSessionBTN_Click(object sender, RoutedEventArgs e)
+        private async void StartSessionBTN_Click(object sender, RoutedEventArgs e)
         {
-            if (this.PpgSamples.Count == 0) return;
-            if (this.PpgSamples.Count < 2) return; // cannot initialize metaData without at least 2 ppg samples
+            if (this.IsSessionStarted) return;
+            if (this.PpgSamples.Count < 2) return;
 
-            try
+            if (this.PreviousDirectories.Contains(this.CurrentDirectoryName)) return;
+            this.PreviousDirectories.Add(this.CurrentDirectoryName);
+
+            await Task.Run(() =>
             {
-                using (ChannelFactory<IPpgService> factory = new ChannelFactory<IPpgService>("SessionHandlingService"))
+                try
                 {
-                    IPpgService proxy = factory.CreateChannel();
-
-                    var metaData = new Meta(this.CurrentDirectoryName, "Galaxy Watch", this.PpgSamples[0], this.PpgSamples[1]);
-                    proxy.StartSession(metaData);
-
-                    this.SessionInfoTB.Text = "Session Started";
-                    this.SessionInfoTB.Foreground = Brushes.Green;
-
-                    foreach (PpgSample sample in this.PpgSamples)
+                    using (ChannelFactory<IPpgService> factory = new ChannelFactory<IPpgService>("SessionHandlingService"))
                     {
-                        proxy.PushSample(sample);
+                        IPpgService proxy = factory.CreateChannel();
+
+                        this.IsSessionStarted = true;
+
+                        var metaData = new Meta(this.CurrentDirectoryName, "Galaxy Watch", this.PpgSamples[0], this.PpgSamples[1]);
+                        proxy.StartSession(metaData);
+
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            this.SessionInfoTB.Text = "Session Started";
+                            this.SessionInfoTB.Foreground = Brushes.Green;
+                        }));
+
+                        foreach (PpgSample sample in this.PpgSamples)
+                        {
+
+                            try 
+                            {
+                                proxy.PushSample(sample);
+                            }
+                            catch (FaultException<ValidationFault> ex)
+                            {
+                                Dispatcher.BeginInvoke(new Action(() =>
+                                {
+                                    this.ExceptionsTB.Text += $"{ex.Detail.RejectedSample.RowIndex}: {ex.Detail.ExceptionMessage}\n";
+                                }));
+                            }
+                            catch (FaultException<DataFormatFault> ex)
+                            {
+                                Dispatcher.BeginInvoke(new Action(() =>
+                                {
+                                    this.ExceptionsTB.Text += $"{ex.Detail.RejectedSample.RowIndex}: {ex.Detail.ExceptionMessage}\n";
+                                }));
+                            }
+                            catch (FaultException ex)
+                            {
+                                Dispatcher.BeginInvoke(new Action(() =>
+                                {
+                                    this.ExceptionsTB.Text += ex.Message + '\n';
+                                }));
+                            }
+
+                        }
+
+                        try
+                        {
+                            proxy.EndSession();
+                            ((IClientChannel)proxy).Close();
+                        }
+                        catch
+                        {
+                            ((IClientChannel)proxy).Abort();
+                        }
+
+                        this.IsSessionStarted = false;
+
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            this.SessionInfoTB.Text = "Session Ended";
+                            this.SessionInfoTB.Foreground = Brushes.Red;
+                        }));
                     }
-                    proxy.EndSession();
-
-                    ((IClientChannel)proxy).Close();
                 }
-            }
-            catch
-            {
-                if (String.IsNullOrEmpty(this.CurrentDirectoryName))
+                catch (CommunicationException cmx)
                 {
-                    MessageBox.Show("Load directory first");
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        this.ExceptionsTB.Text += cmx.Message + '\n';
+                    }));
                 }
-            }
-            finally
-            {
-                this.SessionInfoTB.Text = "Session Ended";
-                this.SessionInfoTB.Foreground = Brushes.Red;
-            }
-
+                finally 
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        this.SessionInfoTB.Text = "Session Aborted";
+                        this.SessionInfoTB.Foreground = Brushes.DarkRed;
+                    }));
+                }
+            });
         }
     }
 }
