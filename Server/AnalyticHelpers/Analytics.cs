@@ -15,10 +15,10 @@ namespace Server.AnalyticHelpers
     {
 
         public delegate void EventHandler(object sender, PpgSample sample);
-        public EventHandler HrOutOfRangeWarning;
-        public EventHandler IbiSpikeWarning;
-        public EventHandler ExcessiveMotionWarning;
-        public EventHandler WeakPpgWarning;
+        public event EventHandler HrOutOfRangeWarning;
+        public event EventHandler IbiSpikeWarning;
+        public event EventHandler ExcessiveMotionWarning;
+        public event EventHandler WeakPpgWarning;
 
         public int HrOutOfRangeWarningCount { get; set; }
         public int IbiSpikeWarningCount { get; set; }
@@ -73,6 +73,13 @@ namespace Server.AnalyticHelpers
 
         }
 
+        public void ResetWarningCounts()
+        {
+            this.HrOutOfRangeWarningCount = 0;
+            this.IbiSpikeWarningCount = 0;
+            this.ExcessiveMotionWarningCount = 0;
+            this.WeakPpgWarningCount = 0;
+        }
 
     }
 }

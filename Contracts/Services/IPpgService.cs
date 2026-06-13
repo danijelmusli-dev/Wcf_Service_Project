@@ -19,7 +19,7 @@ namespace Contracts.Services
         [FaultContract(typeof(DataFormatFault))]
         void PushSample(PpgSample sample);
 
-        [OperationContract]
+        [OperationContract(IsOneWay = true)]
         void EndSession();
     }
 }
