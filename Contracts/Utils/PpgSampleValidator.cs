@@ -23,6 +23,33 @@ namespace Contracts.Utils
             return true;
         }
 
+        public static bool ValidateSampleHR(PpgSample sample)
+        {
+            if (sample is null)
+            { return false; }
+            if (sample.HeartRate < 30 || sample.HeartRate > 220)
+            { return false; }
+            return true;
+        }
+
+        public static bool ValidateSampleIBI(PpgSample sample)
+        {
+            if (sample is null)
+            { return false; }
+            if (sample.IBI_ms < 250 || sample.IBI_ms > 2000)
+            { return false; }
+            return true;
+        }
+
+        public static bool ValidateSamplePpg(PpgSample sample)
+        {
+            if (sample is null)
+            { return false; }
+            if (sample.PpgGreen < 0 || sample.PpgRed < 0 || sample.PpgIr < 0)
+            { return false; }
+            return true;
+        }
+
         public static List<PpgSample> AllValidSamples(List<PpgSample> samples)
         {
             return samples.FindAll(x => PpgSampleValidator.ValidateSample(x) == true);

@@ -3,11 +3,12 @@ using Contracts.Models;
 using Contracts.Utils;
 using Server.AnalyticHelpers;
 using System;
-using System.Threading;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.ServiceModel;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,6 +19,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace Server
 {
@@ -29,35 +31,30 @@ namespace Server
         ServiceHost Host { get; set; } = null;
         SessionHandlingService _service;
         List<PpgSample> RejectedPpgSamples { get; set; } = new List<PpgSample>();
-        Analytics _analitic { get; set; }
+        Analytics Analitic { get; set; }
 
         PpgSample _currSample = new PpgSample();
         PpgSample _prevSample = new PpgSample();
 
+        private readonly object _sampleLock = new object();
+        private readonly object _serverLock = new object();
+
         public MainWindow()
         {
-            InitializeComponent();
-
-            this._service = new SessionHandlingService();
-
-            this._service.TransferStarted += this.OnTransferStarted;
-            this._service.SampleRecieved += this.OnSampleRecieved;
-            this._service.OnTransferCompleted += this.OnTransferCompleted;
-            this._service.OnWarningRaised += this.OnWarningRaised;
-
-            this._analitic = new Analytics();
-
-            this._analitic.HrOutOfRangeWarning += this.OnHrOutOfRangeWarning;
-            this._analitic.WeakPpgWarning += this.OnWeakPpgWarning;
-            this._analitic.ExcessiveMotionWarning += this.OnExcessiveMotionWarning;
-            this._analitic.IbiSpikeWarning += this.OnIbiSpikeWarning;
+            InitializeComponent();    
             
+            this.Analitic = new Analytics();
         }
 
         private void StartServerBTN_Click(object sender, RoutedEventArgs e)
         {
             if (this.Host?.State == CommunicationState.Opened)
             {
+                if (this._service?.IsSessionActive == true)
+                {
+                    MessageBox.Show("Cannot stop server during active session!");
+                    return;
+                }
                 this.StopServer();
             }
             else
@@ -70,11 +67,18 @@ namespace Server
         {
             try
             {
+                this._service = new SessionHandlingService();
+                this.SubscribeToEvents();
+
                 this.Host = new ServiceHost(this._service);
+                this.Host.Faulted += this.OnHostFaulted;
                 this.Host.Open();
 
-                this.StartServerBTN.Content = "Stop";
-                this.ServerStatusIndicator.Fill = Brushes.Green;
+                this.SafeInvokeUIAsync(() =>
+                {
+                    this.StartServerBTN.Content = "Stop";
+                    this.ServerStatusIndicator.Fill = Brushes.Green;
+                });
             }
             catch (Exception ex)
             {
@@ -85,108 +89,188 @@ namespace Server
         }
         private void StopServer()
         {
-            try
+            lock (this._serverLock)
             {
-                if (this.Host != null)
+                try
                 {
-                    if (this.Host.State == CommunicationState.Faulted)
-                        this.Host.Abort();
-                    else
-                        this.Host.Close();
+                    if (this.Host != null)
+                    {
+
+                        this.Host.Faulted -= this.OnHostFaulted;
+                        if (this.Host.State == CommunicationState.Faulted)
+                            this.Host.Abort();
+                        else
+                            this.Host.Close();
+
+                        this.Host = null;
+
+                        this.UnsubscribeFromEvents();
+                        this._service.Dispose();
+                        this._service = null;
+                    }
+
+                    this.SafeInvokeUIAsync(() => {
+                        this.StartServerBTN.Content = "Start";
+                        this.ServerStatusIndicator.Fill = Brushes.Red;
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("Start Server Error: " + ex.Message);
+                    this.Host?.Abort();
 
                     this.Host = null;
+                    this._service = null;
                 }
+            }
+        }
 
-                this.StartServerBTN.Content = "Start";
-                this.ServerStatusIndicator.Fill = Brushes.Red;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-                this.Host?.Abort();
-                this.Host = null;
-            }
+        // this methog gets called if the connection is 
+        // unexpectedly stopped
+        private void OnHostFaulted(object sender, EventArgs e)
+        { 
+            this.SafeInvokeUIAsync(() => {
+                this.EventsTB.Text += "\"Client disconnected unexpectedly - forcing session end.\n\";";
+            });
+
+            this.StopServer();
         }
 
         private void OnTransferStarted(object sender, EventArgs e)
         {
-            this.EventsTB.Text += "Transfer Started! \n";
+            this.Analitic.ResetWarningCounts(); // Reset warning counts at the start of each session
 
-            if (sender is Meta)
-            { 
-                this.MetaDataLV.Items.Add(sender as Meta);
-            }
+            this.SafeInvokeUIAsync(() => { 
                 
+                this.EventsTB.Text += "Transfer Started! \n";
+
+                if (sender is Meta)
+                {
+                    this.MetaDataLV.Items.Add(sender as Meta);
+                }
+            });
         }
 
         private void OnSampleRecieved(object sender, EventArgs e)
         {
             if (sender is PpgSample sample)
             {
-                this._prevSample = this._currSample;
-                this._currSample = sample;
+                lock (this._sampleLock)
+                {
+                    this._prevSample = this._currSample;
+                    this._currSample = sample;
+                }
             }
 
-            _analitic.AnalizePpgSample(this._prevSample, this._currSample);
+            Analitic.AnalizePpgSample(this._prevSample, this._currSample);
         }
 
         private void OnTransferCompleted(object sender, EventArgs e)
         {
+            this.SafeInvokeUIAsync(() => this.EventsTB.Text += "Transfer Completed! \n");
             this.StopServer();
-
-            this.EventsTB.Text += "Transfer Completed! \n";
-
         }
 
         private void OnWarningRaised(object sender, EventArgs e)
         {
-            
+            // Some UI Update with SadeInvokeUIAsync method
+            return;
         }
         private void OnHrOutOfRangeWarning(object sender, PpgSample sample)
         {
-            this._service.OnWarningRaised?.Invoke(sender, EventArgs.Empty);
+            // Some UI Update with SadeInvokeUIAsync method
+            return;
         }
         private void OnIbiSpikeWarning(object sender, PpgSample sample)
         {
-            this._service.OnWarningRaised?.Invoke(sender, EventArgs.Empty);
+            // Some UI Update with SadeInvokeUIAsync method
+            return;
         }
         private void OnExcessiveMotionWarning(object sender, PpgSample sample)
         {
-            this._service.OnWarningRaised?.Invoke(sender, EventArgs.Empty);
+            // Some UI Update with SadeInvokeUIAsync method
+            return;
         }
         private void OnWeakPpgWarning(object sender, PpgSample sample)
         {
-            this._service.OnWarningRaised?.Invoke(sender, EventArgs.Empty);
+            // Some UI Update with SadeInvokeUIAsync method
+            return;
+        }
+
+        private Task SafeInvokeUIAsync(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
+        {
+            if (action is null) return Task.CompletedTask;
+            if (Dispatcher.CheckAccess())
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"UI action error: {ex.Message}");
+                }
+                return Task.CompletedTask;
+            }
+            else
+            {
+                var op = Dispatcher.BeginInvoke(action, priority);
+                return op.Task.ContinueWith(t => {
+                    if (t.Exception != null)
+                    {
+                        Debug.WriteLine($"UI invoke exception: {t.Exception.Message}");
+                    }
+                });
+            }
+        }
+
+        private void SubscribeToEvents()
+        {
+            if (this._service != null)
+            {
+                this._service.TransferStarted += this.OnTransferStarted;
+                this._service.SampleRecieved += this.OnSampleRecieved;
+                this._service.OnTransferCompleted += this.OnTransferCompleted;
+                this._service.OnWarningRaised += this.OnWarningRaised;
+            }
+            if (this.Analitic != null)
+            {
+                this.Analitic.HrOutOfRangeWarning += this.OnHrOutOfRangeWarning;
+                this.Analitic.WeakPpgWarning += this.OnWeakPpgWarning;
+                this.Analitic.ExcessiveMotionWarning += this.OnExcessiveMotionWarning;
+                this.Analitic.IbiSpikeWarning += this.OnIbiSpikeWarning;
+            }
+        }   
+
+        private void UnsubscribeFromEvents()
+        {
+            if(this._service != null)
+            {
+                this._service.TransferStarted -= this.OnTransferStarted;
+                this._service.SampleRecieved -= this.OnSampleRecieved;
+                this._service.OnTransferCompleted -= this.OnTransferCompleted;
+                this._service.OnWarningRaised -= this.OnWarningRaised;
+            }
+
+            if (this.Analitic != null)
+            {
+                this.Analitic.HrOutOfRangeWarning -= this.OnHrOutOfRangeWarning;
+                this.Analitic.WeakPpgWarning -= this.OnWeakPpgWarning;
+                this.Analitic.ExcessiveMotionWarning -= this.OnExcessiveMotionWarning;
+                this.Analitic.IbiSpikeWarning -= this.OnIbiSpikeWarning;
+            }
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            this.UnsubscribeFromEvents();
+            this.StopServer();
 
-            this._service.TransferStarted -= this.OnTransferStarted;
-            this._service.SampleRecieved -= this.OnSampleRecieved;
-            this._service.OnTransferCompleted -= this.OnTransferCompleted;
-            this._service.OnWarningRaised -= this.OnWarningRaised;
+            this.EventsTB.Text = string.Empty;
+            this.MetaDataLV.Items.Clear();
 
-            this._analitic.HrOutOfRangeWarning -= this.OnHrOutOfRangeWarning;
-            this._analitic.WeakPpgWarning -= this.OnWeakPpgWarning;
-            this._analitic.ExcessiveMotionWarning -= this.OnExcessiveMotionWarning;
-            this._analitic.IbiSpikeWarning -= this.OnIbiSpikeWarning;
-
-            if (this.Host != null)
-            {
-                try
-                {
-                    if (this.Host.State == CommunicationState.Faulted)
-                        this.Host.Abort();
-                    else
-                        this.Host.Close();
-                }
-                catch
-                {
-                    this.Host?.Abort();
-                }
-                this.Host = null;
-            }
+            this.RejectedPpgSamples.Clear();
+            this.RejectedPpgSamples.TrimExcess();
         }
     }
 }

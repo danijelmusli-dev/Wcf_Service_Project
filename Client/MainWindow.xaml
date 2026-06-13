@@ -4,13 +4,15 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Wcf_Service_Project"
-                xmlns:uc="clr-namespace:Contracts.UserControls;assembly=Contracts"
+        xmlns:uc="clr-namespace:Contracts.UserControls;assembly=Contracts"
 
         mc:Ignorable="d"
         
         Title="ClientWindow"
         
-        Height="720" Width="600">
+        Height="720" Width="600"
+        Closing="Window_Closing"
+        >
     <Border CornerRadius="5">
         <Grid>
             <Grid.ColumnDefinitions>
