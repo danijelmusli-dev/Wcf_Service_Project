@@ -41,6 +41,8 @@ namespace Wcf_Service_Project
         string CurrentDirectoryName { get; set; } = string.Empty;
 
         int BatchSize { get; set; } = int.Parse(ConfigurationManager.AppSettings["BatchSize"]);
+
+        private int rejectedRows = 0;
         ExceptionHandler ExceptionHandling { get; set; } = new ExceptionHandler();
 
         private CancellationTokenSource _sessionCts;
@@ -71,6 +73,9 @@ namespace Wcf_Service_Project
 
                     this.DirectoriesSP.Children.Add(newDir);
                 }
+                this.LoadingDirPB.Value = 0;
+                this.LoadingDirPB.Visibility = Visibility.Hidden;
+
             }
             catch
             {
@@ -100,11 +105,9 @@ namespace Wcf_Service_Project
 
             // Loading ProgressBar
             this.LoadingDirPB.Value = 0;
-            for (int i = 0; i <= 100; i++)
-            {
-                this.LoadingDirPB.Value++;
-                await Task.Delay(1);
-            }
+            await this.SafeInvokeUIAsync(() => this.LoadingDirPB.Visibility = Visibility.Visible);
+           
+
 
             // Session Started
             this.SessionInfoTB.Text = (this.IsSessionStarted) ? "Session started" : "Session Ended";
@@ -122,6 +125,8 @@ namespace Wcf_Service_Project
             foreach (var sample in this.PpgSamples.GetRange(0, range))
             {
                 this.LoadedRowsTB.Text += sample.ToString() + '\n';
+                LoadingDirPB.Value+=5;
+                await Task.Delay(1);
             }
             this.LoadedRowsTB.Text += "..........";
 
@@ -153,6 +158,7 @@ namespace Wcf_Service_Project
 
             this._sessionCts = new CancellationTokenSource();
             var token = this._sessionCts.Token;
+            this.rejectedRows = 0;
 
             this._sessionTask = Task.Run(async () =>      
             {
@@ -169,6 +175,8 @@ namespace Wcf_Service_Project
 
                     await this.SafeInvokeUIAsync(() => this.IsSessionStarted = true);
                     await this.SafeInvokeUIAsync(() => this.StartSessionBTN.IsEnabled = false);
+                   
+
 
                     var metaData = new Meta(this.CurrentDirectoryName, "Galaxy Watch", this.PpgSamples[0], this.PpgSamples[1]);
                     this._proxy.StartSession(metaData);
@@ -184,7 +192,7 @@ namespace Wcf_Service_Project
                         this.SendSamplesBatch(this._proxy);
                         await Task.Delay(50);
                         // Update UI with error counts
-                        //this.SafeInvokeUI(null);
+                        await this.SafeInvokeUIAsync(() => this.RejectedRowsTxtB.Text = $"Rejected Rows: {rejectedRows}");
                     }
 
                     try { this._proxy?.EndSession(); }
@@ -273,6 +281,7 @@ namespace Wcf_Service_Project
                 catch (FaultException fex)
                 {
                     this.ExceptionHandling.AddFaultException(fex);
+                    rejectedRows++;
                     continue;
                 }
             }

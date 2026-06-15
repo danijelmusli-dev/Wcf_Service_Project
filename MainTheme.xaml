@@ -1,0 +1,17 @@
+<ResourceDictionary xmlns="http://microsoft.com"
+                    xmlns:x="http://microsoft.com">
+
+    <!-- App Canvas (Dark Background) -->
+    <SolidColorBrush x:Key="ApplicationBackgroundBrush" Color="#1E1E1E" />
+
+    <!-- Secondary panels, cards, and sidebars -->
+    <SolidColorBrush x:Key="SecondaryBackgroundBrush" Color="#2D2D30" />
+
+    <!-- Text Colors -->
+    <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#CCCCCC" />
+
+    <!-- Brand Accent Color -->
+    <SolidColorBrush x:Key="SystemAccentColorBrush" Color="#FF5733" />
+
+</ResourceDictionary>

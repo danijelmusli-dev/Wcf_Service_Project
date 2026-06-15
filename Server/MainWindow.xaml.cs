@@ -44,6 +44,7 @@ namespace Server
             InitializeComponent();    
             
             this.Analitic = new Analytics();
+            
         }
 
         private void StartServerBTN_Click(object sender, RoutedEventArgs e)
@@ -159,6 +160,7 @@ namespace Server
                 {
                     this._prevSample = this._currSample;
                     this._currSample = sample;
+                    IncomingRowsTB.Text += sample.ToString() +"/n";
                 }
             }
 
@@ -272,5 +274,7 @@ namespace Server
             this.RejectedPpgSamples.Clear();
             this.RejectedPpgSamples.TrimExcess();
         }
+
+
     }
 }
