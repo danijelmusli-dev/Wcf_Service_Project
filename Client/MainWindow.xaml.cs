@@ -37,12 +37,12 @@ namespace Wcf_Service_Project
         bool IsSessionStarted { get; set; }
 
         List<PpgSample> PpgSamples { get; set; } = new List<PpgSample>();
-
+        List<PpgSample> rejects { get; set; } = new List<PpgSample>();
         string CurrentDirectoryName { get; set; } = string.Empty;
 
         int BatchSize { get; set; } = int.Parse(ConfigurationManager.AppSettings["BatchSize"]);
 
-        private int rejectedRows = 0;
+        int rejectedRows = 0;
         ExceptionHandler ExceptionHandling { get; set; } = new ExceptionHandler();
 
         private CancellationTokenSource _sessionCts;
@@ -158,7 +158,7 @@ namespace Wcf_Service_Project
 
             this._sessionCts = new CancellationTokenSource();
             var token = this._sessionCts.Token;
-            this.rejectedRows = 0;
+            
 
             this._sessionTask = Task.Run(async () =>      
             {
@@ -192,7 +192,17 @@ namespace Wcf_Service_Project
                         this.SendSamplesBatch(this._proxy);
                         await Task.Delay(50);
                         // Update UI with error counts
-                        await this.SafeInvokeUIAsync(() => this.RejectedRowsTxtB.Text = $"Rejected Rows: {rejectedRows}");
+                        await this.SafeInvokeUIAsync(() => 
+                        this.RejectedRowsTxtB.Text = $"Rejected Rows: {rejectedRows}");
+
+                        await this.SafeInvokeUIAsync(() =>
+                        {
+                            this.ExceptionsTB.Text = string.Empty;
+                            List<PpgSample> last10 = rejects.Skip(Math.Max(0, rejects.Count - 10)).ToList();
+                            string text = string.Join(Environment.NewLine, last10.Select(s => s.ToString()));
+                            this.ExceptionsTB.Text += text;
+                        });
+
                     }
 
                     try { this._proxy?.EndSession(); }
@@ -281,6 +291,7 @@ namespace Wcf_Service_Project
                 catch (FaultException fex)
                 {
                     this.ExceptionHandling.AddFaultException(fex);
+                    rejects.Add(sample);
                     rejectedRows++;
                     continue;
                 }

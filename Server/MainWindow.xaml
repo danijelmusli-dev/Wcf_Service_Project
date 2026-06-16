@@ -24,24 +24,28 @@
             <RowDefinition Height="1*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-
-        <ListView x:Name="MetaDataLV"
+        <StackPanel  Grid.Column="0" Grid.Row="1" >
+            <TextBlock Text="Current Participant:" Foreground="{StaticResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" FontSize="30"/>
+            <TextBlock x:Name="CurrentPartTxB" Text="Not chosen" Foreground="{StaticResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" FontSize="20"/>
+            <TextBlock Text="Processed Participants:" Foreground="{StaticResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" FontSize="30"/>
+            <ListView x:Name="MetaDataLV"
                   Grid.Column="0" Grid.Row="1" 
-                  Margin="10"
+                  Margin="10,10,10,0"
                   Background="{DynamicResource ApplicationBackground}"
-                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                  Foreground="{DynamicResource TextFillColorSecondaryBrush}" Width="608"
 
                   
                   >
             <ListView.View>
                 <GridView>
-                    <GridViewColumn Header="ParticipantId" Width="110" DisplayMemberBinding="{Binding ParticipantId}" />
-                    <GridViewColumn Header="DeviceId" Width="110" DisplayMemberBinding="{Binding DeviceId}"/>
-                    <GridViewColumn Header="SampleRateHz" Width="110" DisplayMemberBinding="{Binding SampleRateHz}"/>
-                    <GridViewColumn Header="TimestampOffsetMs" Width="110" DisplayMemberBinding="{Binding TimeStampOffsetMs}"/>
+                    <GridViewColumn Header="ParticipantId" Width="150" DisplayMemberBinding="{Binding ParticipantId}" />
+                    <GridViewColumn Header="DeviceId" Width="150" DisplayMemberBinding="{Binding DeviceId}"/>
+                    <GridViewColumn Header="SampleRateHz" Width="150" DisplayMemberBinding="{Binding SampleRateHz}"/>
+                    <GridViewColumn Header="TimestampOffsetMs" Width="150" DisplayMemberBinding="{Binding TimeStampOffsetMs}"/>
                 </GridView>
             </ListView.View>
         </ListView>
+        </StackPanel>
 
         <StackPanel Grid.Column="1" Grid.Row="1"
                     Orientation="Vertical"
@@ -64,25 +68,7 @@
 
         </StackPanel>
 
-        <StackPanel Grid.Column="1" Grid.Row="2"
-                    Orientation="Horizontal"
-                    Margin="10"
-                    HorizontalAlignment="Center">
-            <StackPanel>
-                <TextBlock Text="Events"
-                           FontSize="20" FontWeight="DemiBold"
-                           Margin="5"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                <TextBox x:Name="EventsTB" 
-                         Width="250" Height="120" 
-                         Margin="5"
-                         IsReadOnly="True"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                         Background="{StaticResource TextBoxBackground}"
-                         />
-            </StackPanel>
-        </StackPanel>
+       
 
         <StackPanel Grid.Column="0" Grid.Row="2"
                     Orientation="Horizontal">
@@ -99,13 +85,7 @@
                     <uc:LabelProgressBar x:Name="ANORM_PG"  Background="{StaticResource TextBoxBackground}" ProgessString="ANM: "  Margin="5"/>
                 </StackPanel>
             </GroupBox>
-            <StackPanel>
-                <TextBlock 
-                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                    Text="Errors"
-                           FontSize="20" FontWeight="DemiBold"
-                           Margin="5"/>
-            </StackPanel>
+           
 
         </StackPanel>
 
@@ -144,6 +124,25 @@ Text="Incoming Rows"
                     Content="Start"
                     Width="73" Height="37" />
         </StackPanel>
-
+        <StackPanel Grid.Column="1" Grid.Row="3"
+             Orientation="Horizontal"
+             Margin="0,10,0,0"
+             HorizontalAlignment="Center" Width="378">
+            <StackPanel Height="117">
+                <TextBlock Text="Events"
+                    FontSize="20" FontWeight="DemiBold"
+                    Margin="5"
+                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" Width="336"/>
+                <TextBox x:Name="EventsTB" 
+                  Width="367" Height="65"
+                  IsReadOnly="True"
+                  TextWrapping="Wrap"
+                  FontSize="20"
+                  
+                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                  Background="{StaticResource TextBoxBackground}" TextChanged="EventsTB_TextChanged"
+                  />
+            </StackPanel>
+        </StackPanel>
     </Grid>
 </Window>

@@ -24,6 +24,10 @@ namespace Contracts.Models
             this.SampleRateHz = (1000 / (secondSample.TimestampMs - firstSample.TimestampMs));
             this.TimeStampOffsetMs = (secondSample.TimestampMs - firstSample.TimestampMs);
         }
+        public override string ToString()
+        {
+            return $"{ParticipantId} | {DeviceId} | {SampleRateHz} | {TimeStampOffsetMs}"; // prilagodi poljima Meta klase
+        }
 
     }
 }

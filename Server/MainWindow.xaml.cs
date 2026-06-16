@@ -31,6 +31,7 @@ namespace Server
         ServiceHost Host { get; set; } = null;
         SessionHandlingService _service;
         List<PpgSample> RejectedPpgSamples { get; set; } = new List<PpgSample>();
+        List<PpgSample> ReceivedSamples { get; set; } = new List<PpgSample>();
         Analytics Analitic { get; set; }
 
         PpgSample _currSample = new PpgSample();
@@ -148,6 +149,7 @@ namespace Server
                 if (sender is Meta)
                 {
                     this.MetaDataLV.Items.Add(sender as Meta);
+                    this.CurrentPartTxB.Text = MetaDataLV.Items[MetaDataLV.Items.Count - 1].ToString();
                 }
             });
         }
@@ -160,8 +162,21 @@ namespace Server
                 {
                     this._prevSample = this._currSample;
                     this._currSample = sample;
-                    IncomingRowsTB.Text += sample.ToString() +"/n";
+                    this.ReceivedSamples.Add(sample);
                 }
+                this.SafeInvokeUIAsync(() =>
+                {
+                    this.IncomingRowsTB.Text = string.Empty;
+
+                    List<PpgSample> last10 = this.ReceivedSamples
+                        .Skip(Math.Max(0, this.ReceivedSamples.Count - 10))
+                        .ToList();
+
+                    this.IncomingRowsTB.Text = string.Join(Environment.NewLine, last10.Select(s => s.ToString()));
+                    this.IncomingRowsTB.ScrollToEnd();
+                });
+
+
             }
 
             Analitic.AnalizePpgSample(this._prevSample, this._currSample);
@@ -275,6 +290,9 @@ namespace Server
             this.RejectedPpgSamples.TrimExcess();
         }
 
-
+        private void EventsTB_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            EventsTB.ScrollToEnd();
+        }
     }
 }
