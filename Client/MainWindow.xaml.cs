@@ -67,11 +67,11 @@ namespace Wcf_Service_Project
                
                 foreach (DirectoryInfo d in directories)
                 {
-                    var newDir = new DataDirectory();
+                    DataDirectory newDir = new DataDirectory();
                     newDir.DirName = d.Name;
                     newDir.MouseDoubleClick += DataDirectory_MouseDoubleClick;
 
-                    var border = new Border
+                    Border border = new Border
                     {
                         BorderBrush = (Brush)Application.Current.Resources["SystemAccentColorBrush"],
                         BorderThickness = new Thickness(1),

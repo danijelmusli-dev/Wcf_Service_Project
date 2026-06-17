@@ -158,13 +158,12 @@ namespace Server
                 }
             });
         }
-
+        
         private void OnSampleRecieved(object sender, EventArgs e)
         {
             if (sender is PpgSample sample)
             {
-                lock (this._sampleLock)
-                {
+             
                     this._prevSample = this._currSample;
                     this._currSample = sample;
                     this.ReceivedSamples.Add(sample);
@@ -185,7 +184,7 @@ namespace Server
                     this.IncomingRowsTB.Text = string.Join(Environment.NewLine, last10.Select(s => s.ToString()));
                         this.IncomingRowsTB.ScrollToEnd();
                     });
-                }
+                
                 
 
 
