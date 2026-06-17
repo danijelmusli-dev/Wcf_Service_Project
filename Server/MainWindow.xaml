@@ -7,7 +7,8 @@
         xmlns:uc="clr-namespace:Contracts.UserControls;assembly=Contracts"
         mc:Ignorable="d"
         Title="ServerWindow" 
-        Background ="{DynamicResource ApplicationBackground}"
+        Background="{StaticResource WindowBackgroundBrush}"
+        
 
         Closing="Window_Closing"
         
@@ -25,14 +26,13 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <StackPanel  Grid.Column="0" Grid.Row="1" >
-            <TextBlock Text="Current Participant:" Foreground="{StaticResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" FontSize="30"/>
-            <TextBlock x:Name="CurrentPartTxB" Text="Not chosen" Foreground="{StaticResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" FontSize="20"/>
-            <TextBlock Text="Processed Participants:" Foreground="{StaticResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" FontSize="30"/>
+            <TextBlock Text="Current Participant:"  HorizontalAlignment="Center" FontSize="30"/>
+            <TextBlock x:Name="CurrentPartTxB" Text="Not chosen" Foreground="{StaticResource SystemAccentColorBrush}" HorizontalAlignment="Center" FontSize="20"/>
+            <TextBlock Text="Processed Participants:"  HorizontalAlignment="Center" FontSize="30"/>
             <ListView x:Name="MetaDataLV"
                   Grid.Column="0" Grid.Row="1" 
                   Margin="10,10,10,0"
-                  Background="{DynamicResource ApplicationBackground}"
-                  Foreground="{DynamicResource TextFillColorSecondaryBrush}" Width="608"
+ Width="608"
 
                   
                   >
@@ -52,52 +52,52 @@
                     Margin="10"
                     HorizontalAlignment="Center" VerticalAlignment="Top">
             <StackPanel>
-                <TextBlock Text="Rejected CSV's"
+                <TextBlock Text="Warnings Log"
                            FontSize="20" FontWeight="DemiBold"
                            Margin="5"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            />
-                <TextBox x:Name="RejectedCSVTB" 
-                         Width="250" Height="180" 
+                <TextBox x:Name="WarningLogTB" 
+                         Width="250" Height="175" 
                          Margin="5"
                          IsReadOnly="True"
                          TextWrapping="Wrap"
-                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                         Background="{StaticResource TextBoxBackground}"/>
+                         />
             </StackPanel>
 
         </StackPanel>
+        <StackPanel Orientation="Horizontal" Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="2">
+            <Border BorderBrush="{StaticResource SystemAccentColorBrush}" BorderThickness="1">
+                <StackPanel Width="500" Margin="5">
+                    <TextBlock  Text="Valid Values:" FontSize="20" Margin="10,10,10,10"/>
+                    <TextBlock  Name="MinHrTb" Text="Minimum Heartrate: " Margin="3" FontSize="18"/>
+                    <TextBlock  Name="MaxHrTb" Text="Maximum Heartrate: " Margin="3" FontSize="18"/>
+                    <TextBlock Name="MaxMotionTb" Text="Motion Treshold: " Margin="3" FontSize="18"/>
+                    <TextBlock Name="ValidIbiTb" Text="Valid IBI Treshold: " Margin="3" FontSize="18"/>
 
-       
-
-        <StackPanel Grid.Column="0" Grid.Row="2"
-                    Orientation="Horizontal">
-            <GroupBox Header="Analytics"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                      Margin="10"
-                      Width="400"
-                      FontSize="20" FontWeight="DemiBold"
-                      VerticalContentAlignment="Center">
-                <StackPanel x:Name="E4Panel" Orientation="Vertical"
-                            VerticalAlignment="Top" Margin="0 10 0 0">
-                    <uc:LabelProgressBar x:Name="HearthRate_PG" Background="{StaticResource TextBoxBackground}" ProgessString="HR: " Margin="5"/>
-                    <uc:LabelProgressBar x:Name="IBI_PG"  Background="{StaticResource TextBoxBackground}" ProgessString="IBI: "  Margin="5"/>
-                    <uc:LabelProgressBar x:Name="ANORM_PG"  Background="{StaticResource TextBoxBackground}" ProgessString="ANM: "  Margin="5"/>
                 </StackPanel>
-            </GroupBox>
-           
+            </Border>
+            <Border BorderBrush="{StaticResource SystemAccentColorBrush}" BorderThickness="1">
+                <StackPanel Width="500" Margin="5" >
+               
+                    <TextBlock Text="Current Values:" FontSize="20" Margin="10,10,10,10"/>
+                    <TextBlock Name="CurrHr" Text="Heartrate: " Margin="3" FontSize="18"/>
+                    <TextBlock Name="CurrMotion" Text="Motion: " Margin="3" FontSize="18"/>
+                    <TextBlock Name="CurrIbi" Text="IBI: " Margin="3" FontSize="18"/>
+            </StackPanel>
+            </Border>
 
         </StackPanel>
+        
+        
+
 
         <StackPanel Grid.Column="0" Grid.Row="3"
                     Margin="5">
-            <TextBlock                              Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+            <TextBlock                             
 Text="Incoming Rows"
                            FontSize="20" FontWeight="DemiBold"
                            Margin="5"/>
             <TextBox 
-                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                Background="{StaticResource TextBoxBackground}"
                 x:Name="IncomingRowsTB" 
                      IsReadOnly="True"
                      Margin="5 0 0 0"
@@ -115,7 +115,7 @@ Text="Incoming Rows"
                        Margin="0 0 5 0"/>
             <Rectangle x:Name="ServerStatusIndicator" 
                        Width="20" Height="20" 
-                       Fill="{DynamicResource SystemAccentColorBrush}" 
+                       Fill="Red" 
                        VerticalAlignment="Center" 
                        RadiusX="50" RadiusY="50"
                        Margin="5 0 15 0"/>
@@ -132,15 +132,14 @@ Text="Incoming Rows"
                 <TextBlock Text="Events"
                     FontSize="20" FontWeight="DemiBold"
                     Margin="5"
-                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" Width="336"/>
+                     Width="336"/>
                 <TextBox x:Name="EventsTB" 
                   Width="367" Height="65"
                   IsReadOnly="True"
                   TextWrapping="Wrap"
                   FontSize="20"
                   
-                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                  Background="{StaticResource TextBoxBackground}" TextChanged="EventsTB_TextChanged"
+                  TextChanged="EventsTB_TextChanged"
                   />
             </StackPanel>
         </StackPanel>

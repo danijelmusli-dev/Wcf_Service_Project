@@ -31,6 +31,10 @@ namespace Server.AnalyticHelpers
         public double IbiOutOfRangePct { get; set; }
         public int PpgMinSignalThreshold { get; set; }
 
+        public double aNorm {  get; set; }
+
+        public double ibiDisc {  get; set; } = 0;
+        public double ibi { get; set; } = 0;
         public Analytics()
         {
             this.HrMinBpm = int.Parse(ConfigurationManager.AppSettings["HrMinBpm"]);
@@ -45,15 +49,15 @@ namespace Server.AnalyticHelpers
             if (prevSample is null) return;
             if (currSample is null) return;
 
-            double aNorm = Math.Sqrt(Math.Pow(currSample.AccX.GetValueOrDefault(0.0), 2) + Math.Pow(currSample.AccY.GetValueOrDefault(0.0), 2) + Math.Pow(currSample.AccZ.GetValueOrDefault(0.0), 2));
+            aNorm = Math.Sqrt(Math.Pow(currSample.AccX.GetValueOrDefault(0.0), 2) + Math.Pow(currSample.AccY.GetValueOrDefault(0.0), 2) + Math.Pow(currSample.AccZ.GetValueOrDefault(0.0), 2));
             if (aNorm > this.AccThreshold)
             {
                 this.ExcessiveMotionWarningCount += 1;
                 ExcessiveMotionWarning?.Invoke(this, currSample);
             }
-
-            double ibiDisc = prevSample.IBI_ms - currSample.IBI_ms;
-            if (ibiDisc > (this.IbiOutOfRangePct * prevSample.IBI_ms))
+            ibiDisc= prevSample.IBI_ms - currSample.IBI_ms;
+            ibi = this.IbiOutOfRangePct * prevSample.IBI_ms;
+            if (ibiDisc > ibi)
             {
                 this.IbiSpikeWarningCount += 1;
                 IbiSpikeWarning?.Invoke(this, currSample);

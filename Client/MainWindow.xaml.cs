@@ -64,18 +64,25 @@ namespace Wcf_Service_Project
                 List<DirectoryInfo> directories = new List<DirectoryInfo>();
                 string root = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../../../DataSet");
                 Directory.GetDirectories(root).ToList().ForEach(d => directories.Add(new DirectoryInfo(d)));
-
+               
                 foreach (DirectoryInfo d in directories)
                 {
                     var newDir = new DataDirectory();
                     newDir.DirName = d.Name;
                     newDir.MouseDoubleClick += DataDirectory_MouseDoubleClick;
 
-                    this.DirectoriesSP.Children.Add(newDir);
-                }
-                this.LoadingDirPB.Value = 0;
-                this.LoadingDirPB.Visibility = Visibility.Hidden;
+                    var border = new Border
+                    {
+                        BorderBrush = (Brush)Application.Current.Resources["SystemAccentColorBrush"],
+                        BorderThickness = new Thickness(1),
+                        Background = (Brush)Application.Current.Resources["PanelBackgroundBrush"],
 
+                    };
+
+                    border.Child = newDir;
+
+                    DirectoriesSP.Children.Add(border);
+                }
             }
             catch
             {
@@ -166,6 +173,7 @@ namespace Wcf_Service_Project
                 this._factory = null;
                 this._clientChannel = null;
                 this._proxy = null;
+                this.rejectedRows = 0;
 
                 try
                 {

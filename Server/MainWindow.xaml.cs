@@ -140,7 +140,12 @@ namespace Server
 
         private void OnTransferStarted(object sender, EventArgs e)
         {
-            this.Analitic.ResetWarningCounts(); // Reset warning counts at the start of each session
+            this.Analitic.ResetWarningCounts(); 
+
+            MinHrTb.Text = $"Minimum Heartrate: {Analitic.HrMinBpm}";
+            MaxHrTb.Text = $"Maximum Heartrate: {Analitic.HrMaxBpm}";
+            MaxMotionTb.Text = $"Motion Treshold: {Analitic.AccThreshold}";
+            ValidIbiTb.Text = $"Valid IBI Treshold: {0}";
 
             this.SafeInvokeUIAsync(() => { 
                 
@@ -163,18 +168,25 @@ namespace Server
                     this._prevSample = this._currSample;
                     this._currSample = sample;
                     this.ReceivedSamples.Add(sample);
-                }
-                this.SafeInvokeUIAsync(() =>
-                {
-                    this.IncomingRowsTB.Text = string.Empty;
+                    
+                    this.SafeInvokeUIAsync(() =>
+                    {
+                        this.IncomingRowsTB.Text = string.Empty;
 
-                    List<PpgSample> last10 = this.ReceivedSamples
-                        .Skip(Math.Max(0, this.ReceivedSamples.Count - 10))
-                        .ToList();
+                        List<PpgSample> last10 = this.ReceivedSamples
+                            .Skip(Math.Max(0, this.ReceivedSamples.Count - 10))
+                            .ToList();
+
+                        CurrHr.Text = $"Heartrate: {sample.HeartRate}";
+                        CurrMotion.Text = $"Motion: {Analitic.aNorm}";
+                        ValidIbiTb.Text = $"Valid IBI Treshold: {Analitic.ibiDisc}";
+                        CurrIbi.Text = $"IBI: {Analitic.ibi}";
 
                     this.IncomingRowsTB.Text = string.Join(Environment.NewLine, last10.Select(s => s.ToString()));
-                    this.IncomingRowsTB.ScrollToEnd();
-                });
+                        this.IncomingRowsTB.ScrollToEnd();
+                    });
+                }
+                
 
 
             }
@@ -188,30 +200,44 @@ namespace Server
             this.StopServer();
         }
 
-        private void OnWarningRaised(object sender, EventArgs e)
+        private async void OnWarningRaised(object sender, EventArgs e)
         {
-            // Some UI Update with SadeInvokeUIAsync method
+            
             return;
         }
-        private void OnHrOutOfRangeWarning(object sender, PpgSample sample)
+        private async void OnHrOutOfRangeWarning(object sender, PpgSample sample)
         {
-            // Some UI Update with SadeInvokeUIAsync method
+            await this.SafeInvokeUIAsync(() =>
+            {
+                this.WarningLogTB.Text += $"Heart rate out of range! min|max: {Analitic.HrMinBpm}|{Analitic.HrMaxBpm} , current: {sample.HeartRate} , HrOutOfRangeWarning count: {Analitic.HrOutOfRangeWarningCount}\n";
+            });
+                return;
+        }
+        private async void OnIbiSpikeWarning(object sender, PpgSample sample)
+        {
+            await this.SafeInvokeUIAsync(() =>
+            {
+                this.WarningLogTB.Text += $"Ibi Spiked! IbiSpikeWarning count: {Analitic.IbiSpikeWarningCount}\n";
+            });
+            return;
+            
+        }
+        private async void OnExcessiveMotionWarning(object sender, PpgSample sample)
+        {
+            await this.SafeInvokeUIAsync(() =>
+            {
+                this.WarningLogTB.Text += $"Excessive motion! ExcessiveMotionWarning count: {Analitic.ExcessiveMotionWarningCount}\n";
+            });
             return;
         }
-        private void OnIbiSpikeWarning(object sender, PpgSample sample)
+        private async void OnWeakPpgWarning(object sender, PpgSample sample)
         {
-            // Some UI Update with SadeInvokeUIAsync method
+            await this.SafeInvokeUIAsync(() =>
+            {
+                this.WarningLogTB.Text += $"Weak Ppg! Green: {sample.PpgGreen} , Red: {sample.PpgRed} , Ir: {sample.PpgIr} , WeakPpgWarning count: {Analitic.WeakPpgWarningCount}\n";
+            });
             return;
-        }
-        private void OnExcessiveMotionWarning(object sender, PpgSample sample)
-        {
-            // Some UI Update with SadeInvokeUIAsync method
-            return;
-        }
-        private void OnWeakPpgWarning(object sender, PpgSample sample)
-        {
-            // Some UI Update with SadeInvokeUIAsync method
-            return;
+            
         }
 
         private Task SafeInvokeUIAsync(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
@@ -294,5 +320,7 @@ namespace Server
         {
             EventsTB.ScrollToEnd();
         }
+
+
     }
 }
