@@ -305,6 +305,7 @@ namespace Wcf_Service_Project
                 }
             }
 
+            this.ExceptionHandling.Reset();
             this.PpgSamples.RemoveRange(0, Math.Min(this.BatchSize, this.PpgSamples.Count));
         }
 
