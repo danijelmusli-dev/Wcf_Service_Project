@@ -34,19 +34,11 @@ namespace Contracts.Utils
                 sample.PpgRed = bvpValue;
                 sample.PpgIr = bvpValue;
 
-                // IBI.csv format: timestamp,duration
-                if (ibiLine != null)
-                {
-                    string[] ibiData = ibiLine.Split(',');
-                    if (ibiData.Length >= 2 && long.TryParse(ibiData[1], out long ibiDuration))
-                        sample.IBI_ms = (int)(ibiDuration / 1000);
-                    else
-                        sample.IBI_ms = 0;
-                }
+                // E4 IBI.csv: each line is a single float value in seconds
+                if (ibiLine != null && double.TryParse(ibiLine.Trim(), System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out double ibiSeconds))
+                    sample.IBI_ms = (int)(ibiSeconds * 1000);
                 else
-                {
                     sample.IBI_ms = 0;
-                }
 
                 sample.ParticipantId = participantId;
                 sample.RowIndex = rowIndex;

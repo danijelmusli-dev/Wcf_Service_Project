@@ -170,7 +170,7 @@ namespace Server
                 EventsTB.Text += "Transfer Completed!\n";
                 IncomingRowsTB.Text = $"Received: {received} (Done)";
             });
-            StopServer();
+            // Server stays running — ready for next session
         }
 
         private void OnWarningRaised(object sender, EventArgs e)

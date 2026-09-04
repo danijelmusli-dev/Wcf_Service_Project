@@ -30,7 +30,12 @@ namespace Server
             string folderPath = Path.Combine(rootPath, "Data", metaData.ParticipantId, metaData.DeviceId, DateTime.Now.ToString("yyyy-MM-dd"));
 
             try { Directory.CreateDirectory(folderPath); }
-            catch (Exception ex) { MessageBox.Show(ex.Message); }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"CreateDirectory error: {ex.Message}");
+                Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
+                    MessageBox.Show(ex.Message, "Server Error", MessageBoxButton.OK, MessageBoxImage.Error)));
+            }
 
             string sessionFilePath = Path.Combine(folderPath, "session.csv");
             string rejectsFilePath = Path.Combine(folderPath, "rejects.csv");

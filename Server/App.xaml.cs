@@ -19,7 +19,9 @@ namespace Server
         private void Current_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
             Log($"Dispatcher Unhandled: {e.Exception}");
-            e.Handled = false;
+            System.Windows.MessageBox.Show($"Unexpected error:\n{e.Exception.Message}", "Error",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            e.Handled = true;
         }
 
         private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
