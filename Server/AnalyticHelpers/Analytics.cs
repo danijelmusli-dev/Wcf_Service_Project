@@ -1,85 +1,81 @@
-﻿using Contracts.Models;
-using Server.Streams;
+using Contracts.Models;
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Configuration;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Server.AnalyticHelpers
 {
-
     public class Analytics
     {
+        public delegate void WarningEventHandler(object sender, PpgSample sample);
 
-        public delegate void EventHandler(object sender, PpgSample sample);
-        public event EventHandler HrOutOfRangeWarning;
-        public event EventHandler IbiSpikeWarning;
-        public event EventHandler ExcessiveMotionWarning;
-        public event EventHandler WeakPpgWarning;
+        public event WarningEventHandler HrOutOfRangeWarning;
+        public event WarningEventHandler IbiSpikeWarning;
+        public event WarningEventHandler ExcessiveMotionWarning;
+        public event WarningEventHandler WeakPpgWarning;
 
-        public int HrOutOfRangeWarningCount { get; set; }
-        public int IbiSpikeWarningCount { get; set; }
-        public int ExcessiveMotionWarningCount { get; set; }
-        public int WeakPpgWarningCount { get; set; }
+        public int HrOutOfRangeWarningCount { get; private set; }
+        public int IbiSpikeWarningCount { get; private set; }
+        public int ExcessiveMotionWarningCount { get; private set; }
+        public int WeakPpgWarningCount { get; private set; }
 
-        public int HrMinBpm { get; set; }
-        public int HrMaxBpm { get; set; }
-        public double AccThreshold { get; set; }
-        public double IbiOutOfRangePct { get; set; }
-        public int PpgMinSignalThreshold { get; set; }
+        public int HrMinBpm { get; }
+        public int HrMaxBpm { get; }
+        public double AccThreshold { get; }
+        public double IbiOutOfRangePct { get; }
+        public int PpgMinSignalThreshold { get; }
 
         public Analytics()
         {
-            this.HrMinBpm = int.Parse(ConfigurationManager.AppSettings["HrMinBpm"]);
-            this.HrMaxBpm = int.Parse(ConfigurationManager.AppSettings["HrMaxBpm"]);
-            this.AccThreshold = double.Parse(ConfigurationManager.AppSettings["AccMotionThreshold"]);
-            this.IbiOutOfRangePct = double.Parse(ConfigurationManager.AppSettings["IbiOutOfRangePct"]);
-            this.PpgMinSignalThreshold = int.Parse(ConfigurationManager.AppSettings["PpgMinSignalThreshold"]);
+            HrMinBpm = int.Parse(ConfigurationManager.AppSettings["HrMinBpm"]);
+            HrMaxBpm = int.Parse(ConfigurationManager.AppSettings["HrMaxBpm"]);
+            AccThreshold = double.Parse(ConfigurationManager.AppSettings["AccMotionThreshold"]);
+            IbiOutOfRangePct = double.Parse(ConfigurationManager.AppSettings["IbiOutOfRangePct"]);
+            PpgMinSignalThreshold = int.Parse(ConfigurationManager.AppSettings["PpgMinSignalThreshold"]);
         }
 
-        public void AnalizePpgSample(PpgSample prevSample, PpgSample currSample)
+        public void AnalyzePpgSample(PpgSample prevSample, PpgSample currSample)
         {
-            if (prevSample is null) return;
-            if (currSample is null) return;
+            if (prevSample is null || currSample is null) return;
 
-            double aNorm = Math.Sqrt(Math.Pow(currSample.AccX.GetValueOrDefault(0.0), 2) + Math.Pow(currSample.AccY.GetValueOrDefault(0.0), 2) + Math.Pow(currSample.AccZ.GetValueOrDefault(0.0), 2));
-            if (aNorm > this.AccThreshold)
+            double aNorm = Math.Sqrt(
+                Math.Pow(currSample.AccX.GetValueOrDefault(), 2) +
+                Math.Pow(currSample.AccY.GetValueOrDefault(), 2) +
+                Math.Pow(currSample.AccZ.GetValueOrDefault(), 2));
+
+            if (aNorm > AccThreshold)
             {
-                this.ExcessiveMotionWarningCount += 1;
+                ExcessiveMotionWarningCount++;
                 ExcessiveMotionWarning?.Invoke(this, currSample);
             }
 
-            double ibiDisc = prevSample.IBI_ms - currSample.IBI_ms;
-            if (ibiDisc > (this.IbiOutOfRangePct * prevSample.IBI_ms))
+            double ibiDelta = prevSample.IBI_ms - currSample.IBI_ms;
+            if (ibiDelta > IbiOutOfRangePct * prevSample.IBI_ms)
             {
-                this.IbiSpikeWarningCount += 1;
+                IbiSpikeWarningCount++;
                 IbiSpikeWarning?.Invoke(this, currSample);
             }
 
-            if (currSample.HeartRate < this.HrMinBpm || currSample.HeartRate > this.HrMaxBpm)
+            if (currSample.HeartRate < HrMinBpm || currSample.HeartRate > HrMaxBpm)
             {
-                this.HrOutOfRangeWarningCount += 1;
+                HrOutOfRangeWarningCount++;
                 HrOutOfRangeWarning?.Invoke(this, currSample);
             }
 
-            if (currSample.PpgGreen < this.PpgMinSignalThreshold || currSample.PpgRed < this.PpgMinSignalThreshold || currSample.PpgIr < this.PpgMinSignalThreshold)
+            if (currSample.PpgGreen < PpgMinSignalThreshold ||
+                currSample.PpgRed < PpgMinSignalThreshold ||
+                currSample.PpgIr < PpgMinSignalThreshold)
             {
-                this.WeakPpgWarningCount += 1;
+                WeakPpgWarningCount++;
                 WeakPpgWarning?.Invoke(this, currSample);
             }
-
         }
 
         public void ResetWarningCounts()
         {
-            this.HrOutOfRangeWarningCount = 0;
-            this.IbiSpikeWarningCount = 0;
-            this.ExcessiveMotionWarningCount = 0;
-            this.WeakPpgWarningCount = 0;
+            HrOutOfRangeWarningCount = 0;
+            IbiSpikeWarningCount = 0;
+            ExcessiveMotionWarningCount = 0;
+            WeakPpgWarningCount = 0;
         }
-
     }
 }

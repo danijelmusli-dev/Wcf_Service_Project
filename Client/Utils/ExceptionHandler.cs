@@ -1,62 +1,50 @@
-﻿using Contracts.Models;
+using Contracts.Models;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.ServiceModel;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Wcf_Service_Project.Utils
 {
     public class ExceptionHandler : IDisposable
     {
+        public int ValidationFaultCount { get; set; }
+        public int DataFormatFaultCount { get; set; }
+        public int OtherFaultCount { get; set; }
+        public int TotalFaultCount => ValidationFaultCount + DataFormatFaultCount + OtherFaultCount;
 
-        public int ValidationFaultCount { get; set; } = 0;
-        public int DataFormatFaultCount { get; set; } = 0;
-        public int OtherFaultCount { get; set; } = 0;
-        public int TotalFaultCount { get { return ValidationFaultCount + DataFormatFaultCount; } }
+        public void AddRejection(PpgSampleResult result)
+        {
+            if (result == null || result.IsValid) return;
 
-        public Queue<ValidationFault> ValidationFaluts { get; set; } = new Queue<ValidationFault>();
-        public Queue<DataFormatFault> DataFormatFaults { get; set; } = new Queue<DataFormatFault>();
+            if (result.Reason != null && result.Reason.Contains("PPG"))
+                DataFormatFaultCount++;
+            else if (result.Reason != null)
+                ValidationFaultCount++;
+            else
+                OtherFaultCount++;
+        }
 
         public void AddFaultException(FaultException fex)
         {
             if (fex is null) return;
 
-            if (fex is FaultException<ValidationFault> vex)
-            { 
-                this.ValidationFaultCount++;
-                this.ValidationFaluts.Enqueue(vex.Detail);
-            }
-            else if (fex is FaultException<DataFormatFault> dfex)
-            {
-                this.DataFormatFaultCount++;
-                this.DataFormatFaults.Enqueue(dfex.Detail);
-            }
+            if (fex is FaultException<ValidationFault>)
+                ValidationFaultCount++;
+            else if (fex is FaultException<DataFormatFault>)
+                DataFormatFaultCount++;
             else
-            {
-                this.OtherFaultCount++;
-            }
-
+                OtherFaultCount++;
         }
 
-        public void Reset(bool dispose = false)
+        public void Reset()
         {
-            this.ValidationFaultCount = 0;
-            this.DataFormatFaultCount = 0;
-            this.OtherFaultCount = 0;
-
-            if (dispose) this.Dispose();
-     
+            ValidationFaultCount = 0;
+            DataFormatFaultCount = 0;
+            OtherFaultCount = 0;
         }
 
         public void Dispose()
         {
-            this.ValidationFaluts.Clear();
-            this.DataFormatFaults.Clear();
-            this.ValidationFaluts.TrimExcess();
-            this.DataFormatFaults.TrimExcess();
+            Reset();
         }
-
     }
 }

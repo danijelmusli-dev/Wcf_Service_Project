@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Serialization;
-using System.ServiceModel;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Contracts.Models
 {
@@ -14,11 +8,12 @@ namespace Contracts.Models
         [DataMember] public string ExceptionMessage { get; set; }
         [DataMember] public PpgSample RejectedSample { get; set; }
 
+        public ValidationFault() { }
+
         public ValidationFault(string message, PpgSample sample)
         {
-            this.ExceptionMessage = message;
-            this.RejectedSample = sample;
+            ExceptionMessage = message;
+            RejectedSample = sample;
         }
-
     }
 }

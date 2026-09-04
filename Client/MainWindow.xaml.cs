@@ -1,4 +1,3 @@
-﻿using Contracts;
 using Contracts.Models;
 using Contracts.Services;
 using Contracts.UserControls;
@@ -10,42 +9,29 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.ServiceModel;
-using System.ServiceModel.Description;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 using Wcf_Service_Project.Utils;
 
 namespace Wcf_Service_Project
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
-        bool IsSessionStarted { get; set; }
+        private bool IsSessionStarted { get; set; }
+        private List<PpgSample> PpgSamples { get; set; } = new List<PpgSample>();
+        private string CurrentDirectoryName { get; set; } = string.Empty;
+        private int BatchSize { get; set; } = int.Parse(ConfigurationManager.AppSettings["BatchSize"]);
+        private ExceptionHandler ExceptionHandling { get; set; } = new ExceptionHandler();
 
-        List<PpgSample> PpgSamples { get; set; } = new List<PpgSample>();
-
-        string CurrentDirectoryName { get; set; } = string.Empty;
-
-        int BatchSize { get; set; } = int.Parse(ConfigurationManager.AppSettings["BatchSize"]);
-        ExceptionHandler ExceptionHandling { get; set; } = new ExceptionHandler();
+        private int _sendIndex;
+        private int _totalSamples;
 
         private CancellationTokenSource _sessionCts;
         private Task _sessionTask;
-        // Keep references so window closing can close the session/channel
         private ChannelFactory<IPpgService> _factory;
         private IClientChannel _clientChannel;
         private IPpgService _proxy;
@@ -59,75 +45,71 @@ namespace Wcf_Service_Project
         {
             try
             {
-                List<DirectoryInfo> directories = new List<DirectoryInfo>();
-                string root = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../../../DataSet");
-                Directory.GetDirectories(root).ToList().ForEach(d => directories.Add(new DirectoryInfo(d)));
+                string root = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../../../DataSet");
+                var directories = Directory.GetDirectories(root).Select(d => new DirectoryInfo(d));
 
-                foreach (DirectoryInfo d in directories)
+                foreach (var d in directories)
                 {
-                    var newDir = new DataDirectory();
-                    newDir.DirName = d.Name;
+                    var newDir = new DataDirectory { DirName = d.Name };
                     newDir.MouseDoubleClick += DataDirectory_MouseDoubleClick;
-
-                    this.DirectoriesSP.Children.Add(newDir);
+                    DirectoriesSP.Children.Add(newDir);
                 }
             }
             catch
             {
-                this.LoadedRowsTB.Text += "Error loading directories.\n";
+                LoadedRowsTB.Text += "Error loading directories.\n";
             }
         }
 
         private async void DataDirectory_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (this.IsSessionStarted) return;
+            if (IsSessionStarted) return;
 
-            Stopwatch stopwatch = new Stopwatch();
-            if (!this.CurrentDirectoryName.Equals(((DataDirectory)sender).DirName))
+            try
             {
-                this.PpgSamples.Clear();
-                this.PpgSamples.TrimExcess();
+                var dir = (DataDirectory)sender;
+                if (CurrentDirectoryName.Equals(dir.DirName)) return;
 
-                stopwatch.Start();
-                this.PpgSamples = PpgConverter.ConvertToPpgSamples(((DataDirectory)sender).DirName, "GalaxyWatch");
+                PpgSamples.Clear();
+                PpgSamples.TrimExcess();
+
+                var stopwatch = Stopwatch.StartNew();
+                PpgSamples = PpgConverter.ConvertToPpgSamples(dir.DirName, "GalaxyWatch");
                 stopwatch.Stop();
 
-                this.CurrentDirectoryName = ((DataDirectory)sender).DirName;
+                CurrentDirectoryName = dir.DirName;
 
+                LoadingDirPB.Value = 0;
+                LoadingDirPB.Maximum = 100;
+                for (int i = 0; i <= 100; i++)
+                {
+                    LoadingDirPB.Value = i;
+                    await Task.Delay(1);
+                }
+
+                SessionInfoTB.Text = "Data Loaded";
+                SessionInfoTB.Foreground = Brushes.Green;
+                RowNumInfoTB.Text = $"Rows Loaded: {PpgSamples.Count}";
+                LoadingTimeInfoTB.Text = $"Loading time: {stopwatch.Elapsed.TotalMilliseconds:F0} ms";
+
+                LoadedRowsTB.Text = string.Empty;
+                int range = Math.Min(30, PpgSamples.Count);
+                foreach (var sample in PpgSamples.GetRange(0, range))
+                    LoadedRowsTB.Text += sample + "\n";
+
+                if (PpgSamples.Count > 30)
+                    LoadedRowsTB.Text += "..........";
             }
-            else return;
-
-
-            // Loading ProgressBar
-            this.LoadingDirPB.Value = 0;
-            for (int i = 0; i <= 100; i++)
+            catch (Exception ex)
             {
-                this.LoadingDirPB.Value++;
-                await Task.Delay(1);
+                SessionInfoTB.Text = "Error loading data";
+                SessionInfoTB.Foreground = Brushes.DarkRed;
+                Debug.WriteLine($"DataDirectory load error: {ex}");
+                MessageBox.Show($"Error loading data:\n{ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-
-            // Session Started
-            this.SessionInfoTB.Text = (this.IsSessionStarted) ? "Session started" : "Session Ended";
-            this.SessionInfoTB.Foreground = (this.IsSessionStarted) ? Brushes.Green : Brushes.Red;
-
-            // Rows Loaded
-            this.RowNumInfoTB.Text = $"Rows Loaded: {this.PpgSamples.Count}";
-
-            // Loading Time
-            this.LoadingTimeInfoTB.Text = $"Loading time: {stopwatch.Elapsed.TotalMilliseconds} ms";
-
-            // Loaded rows
-            this.LoadedRowsTB.Text = string.Empty;
-            int range = (this.PpgSamples.Count >= 30) ? 30 : this.PpgSamples.Count;
-            foreach (var sample in this.PpgSamples.GetRange(0, range))
-            {
-                this.LoadedRowsTB.Text += sample.ToString() + '\n';
-            }
-            this.LoadedRowsTB.Text += "..........";
-
         }
 
-        void SafeClose(ICommunicationObject obj)
+        private void SafeClose(ICommunicationObject obj)
         {
             if (obj is null) return;
             try
@@ -137,177 +119,176 @@ namespace Wcf_Service_Project
                 else
                     obj.Close();
             }
-            catch (TimeoutException) { obj.Abort(); }
-            catch (CommunicationException) { obj.Abort(); }
-            catch (Exception) { obj.Abort(); }
+            catch { obj.Abort(); }
         }
 
         private async void StartSessionBTN_Click(object sender, RoutedEventArgs e)
         {
-            if (this.IsSessionStarted)
+            if (IsSessionStarted)
             {
-                this.SessionInfoTB.Text = "Session Already Started";
-                this.SessionInfoTB.Foreground = Brushes.DarkCyan;
+                SessionInfoTB.Text = "Session Already Started";
+                SessionInfoTB.Foreground = Brushes.DarkCyan;
                 return;
             }
 
-            this._sessionCts = new CancellationTokenSource();
-            var token = this._sessionCts.Token;
+            _sessionCts = new CancellationTokenSource();
+            var token = _sessionCts.Token;
 
-            this._sessionTask = Task.Run(async () =>      
+            await (_sessionTask = Task.Run(async () =>
             {
-                // use instance fields so Window_Closing can access them
-                this._factory = null;
-                this._clientChannel = null;
-                this._proxy = null;
+                _factory = null;
+                _clientChannel = null;
+                _proxy = null;
 
                 try
                 {
-                    this._factory = new ChannelFactory<IPpgService>("SessionHandlingService");
-                    this._proxy = this._factory.CreateChannel();
-                    this._clientChannel = this._proxy as IClientChannel;
+                    _factory = new ChannelFactory<IPpgService>("SessionHandlingService");
+                    _proxy = _factory.CreateChannel();
+                    _clientChannel = _proxy as IClientChannel;
 
-                    await this.SafeInvokeUIAsync(() => this.IsSessionStarted = true);
-                    await this.SafeInvokeUIAsync(() => this.StartSessionBTN.IsEnabled = false);
-
-                    var metaData = new Meta(this.CurrentDirectoryName, "Galaxy Watch", this.PpgSamples[0], this.PpgSamples[1]);
-                    this._proxy.StartSession(metaData);
-
-                    await this.SafeInvokeUIAsync(() =>
+                    if (PpgSamples.Count < 2)
                     {
-                        this.SessionInfoTB.Text = "Session Started";
-                        this.SessionInfoTB.Foreground = Brushes.Green;
-                    });
-
-                    while (this.PpgSamples.Count > 0)
-                    {
-                        this.SendSamplesBatch(this._proxy);
-                        await Task.Delay(50);
-                        // Update UI with error counts
-                        //this.SafeInvokeUI(null);
+                        await SafeInvokeUIAsync(() =>
+                        {
+                            SessionInfoTB.Text = "Not enough data (need at least 2 samples)";
+                            SessionInfoTB.Foreground = Brushes.DarkRed;
+                        });
+                        return;
                     }
 
-                    try { this._proxy?.EndSession(); }
-                    catch (Exception ex) 
-                    { Debug.WriteLine($"End Session Error: ${ex.Message}"); }
-
-                    this.SafeClose(this._clientChannel);
-                    this.SafeClose(this._factory);
-
-                    await this.SafeInvokeUIAsync(() =>
+                    await SafeInvokeUIAsync(() =>
                     {
-                        this.SessionInfoTB.Text = "Session Ended";
-                        this.SessionInfoTB.Foreground = Brushes.Red;
+                        IsSessionStarted = true;
+                        StartSessionBTN.IsEnabled = false;
+                    });
+
+                    var metaData = new Meta(CurrentDirectoryName, "Galaxy Watch", PpgSamples[0], PpgSamples[1]);
+                    _proxy.StartSession(metaData);
+
+                    _sendIndex = 0;
+                    _totalSamples = PpgSamples.Count;
+
+                    await SafeInvokeUIAsync(() =>
+                    {
+                        SessionInfoTB.Text = "Sending...";
+                        SessionInfoTB.Foreground = Brushes.Green;
+                        LoadingDirPB.Maximum = _totalSamples;
+                        LoadingDirPB.Value = 0;
+                    });
+
+                    while (_sendIndex < _totalSamples)
+                    {
+                        if (token.IsCancellationRequested) break;
+
+                        int count = Math.Min(BatchSize, _totalSamples - _sendIndex);
+                        var batch = PpgSamples.GetRange(_sendIndex, count);
+
+                        var results = _proxy.PushSamples(batch);
+                        foreach (var result in results)
+                        {
+                            if (!result.IsValid)
+                                ExceptionHandling.AddRejection(result);
+                        }
+
+                        _sendIndex += count;
+
+                        int sent = _sendIndex;
+                        int total = _totalSamples;
+                        int rejected = ExceptionHandling.TotalFaultCount;
+                        await SafeInvokeUIAsync(() =>
+                        {
+                            RowNumInfoTB.Text = $"Sent: {sent} / {total}";
+                            ExceptionsTB.Text = $"Rejected: {rejected}";
+                            LoadingDirPB.Value = sent;
+                        });
+
+                        await Task.Delay(20);
+                    }
+
+                    try { _proxy?.EndSession(); }
+                    catch (Exception ex) { Debug.WriteLine($"EndSession Error: {ex.Message}"); }
+
+                    SafeClose(_clientChannel);
+                    SafeClose(_factory);
+
+                    await SafeInvokeUIAsync(() =>
+                    {
+                        SessionInfoTB.Text = "Session Completed";
+                        SessionInfoTB.Foreground = Brushes.Green;
                     });
                 }
                 catch (Exception ex)
                 {
-                    this.SafeClose(this._clientChannel);
-                    this.SafeClose(this._factory);
+                    SafeClose(_clientChannel);
+                    SafeClose(_factory);
 
-                    await this.SafeInvokeUIAsync(() =>
+                    await SafeInvokeUIAsync(() =>
                     {
                         Debug.WriteLine(ex.Message);
-                        this.SessionInfoTB.Text = "Session Aborted";
-                        this.SessionInfoTB.Foreground = Brushes.DarkRed;
+                        SessionInfoTB.Text = "Session Aborted";
+                        SessionInfoTB.Foreground = Brushes.DarkRed;
                     });
                 }
                 finally
                 {
-                    await this.SafeInvokeUIAsync(() => { 
-                        this.IsSessionStarted = false; 
-                        this.StartSessionBTN.IsEnabled = true;
+                    await SafeInvokeUIAsync(() =>
+                    {
+                        IsSessionStarted = false;
+                        StartSessionBTN.IsEnabled = true;
                     });
 
-                    this.ExceptionHandling.Dispose();
-                    
-                    this.PpgSamples.Clear();
-                    this.PpgSamples.TrimExcess();
+                    ExceptionHandling.Dispose();
+                    PpgSamples.Clear();
+                    PpgSamples.TrimExcess();
+                    _sendIndex = 0;
+                    _totalSamples = 0;
 
-                    // clear stored references
-                    this._proxy = null;
-                    this._clientChannel = null;
-                    this._factory = null;
+                    _proxy = null;
+                    _clientChannel = null;
+                    _factory = null;
+                    _sessionCts?.Dispose();
+                    _sessionCts = null;
                 }
-
-            }, token);
-
+            }, token));
         }
 
-        // Called after each batch is sent to update the UI with the latest info
         private Task SafeInvokeUIAsync(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
         {
             if (action is null) return Task.CompletedTask;
             if (Dispatcher.CheckAccess())
             {
-                try 
-                { 
-                    action(); 
-                }
-                catch(Exception ex)
-                {
-                    Debug.WriteLine($"UI action error: {ex.Message}");
-                }
+                try { action(); }
+                catch (Exception ex) { Debug.WriteLine($"UI action error: {ex.Message}"); }
                 return Task.CompletedTask;
             }
-            else
-            {
-                var op = Dispatcher.BeginInvoke(action, priority);
-                return op.Task.ContinueWith(t => { 
-                    if(t.Exception != null)
-                    {
-                        Debug.WriteLine($"UI invoke exception: {t.Exception.Message}");
-                    }
-                });
-            }
-        }
 
-        private void SendSamplesBatch(IPpgService proxy)
-        {
-            foreach (PpgSample sample in this.PpgSamples.GetRange(0, Math.Min(this.BatchSize, this.PpgSamples.Count)))
+            var op = Dispatcher.BeginInvoke(action, priority);
+            return op.Task.ContinueWith(t =>
             {
-                try
-                {
-                    proxy.PushSample(sample);
-                }
-                catch (FaultException fex)
-                {
-                    this.ExceptionHandling.AddFaultException(fex);
-                    continue;
-                }
-            }
-
-            this.PpgSamples.RemoveRange(0, Math.Min(this.BatchSize, this.PpgSamples.Count));
+                if (t.Exception != null)
+                    Debug.WriteLine($"UI invoke exception: {t.Exception.Message}");
+            });
         }
 
         private async void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (this.IsSessionStarted)
-            {
-                e.Cancel = true;
-                // try to end session gracefully
-                try
-                {
-                    this._proxy?.EndSession();
-                }
-                catch { }
+            if (!IsSessionStarted) return;
 
-                // cancel the background task and wait a short time
-                try { this._sessionCts?.Cancel(); } catch { }
-                try { await Task.WhenAny(this._sessionTask ?? Task.CompletedTask, Task.Delay(2000)); } catch { }
+            e.Cancel = true;
 
-                // ensure channels/factory closed
-                try { this.SafeClose(this._clientChannel); } catch { }
-                try { this.SafeClose(this._factory); } catch { }
+            try { _proxy?.EndSession(); } catch { }
+            try { _sessionCts?.Cancel(); } catch { }
+            try { await Task.WhenAny(_sessionTask ?? Task.CompletedTask, Task.Delay(2000)); } catch { }
 
-                // clear state
-                this.IsSessionStarted = false;
-                this._proxy = null;
-                this._clientChannel = null;
-                this._factory = null;
+            SafeClose(_clientChannel);
+            SafeClose(_factory);
 
-                Application.Current.Shutdown();
-            }
+            IsSessionStarted = false;
+            _proxy = null;
+            _clientChannel = null;
+            _factory = null;
+
+            Application.Current.Shutdown();
         }
     }
 }

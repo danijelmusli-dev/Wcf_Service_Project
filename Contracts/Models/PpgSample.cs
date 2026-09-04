@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Contracts.Models
 {
@@ -28,18 +23,10 @@ namespace Contracts.Models
 
         public override string ToString()
         {
-            return $"Row {RowIndex} | " +
-                   $"Timestamp: {TimestampMs} ms | " +
-                   $"PPG(Green={PpgGreen?.ToString() ?? "null"}, " +
-                   $"Red={PpgRed?.ToString() ?? "null"}, " +
-                   $"Ir={PpgIr?.ToString() ?? "null"}) | " +
-                   $"ACC(X={AccX?.ToString() ?? "null"}, " +
-                   $"Y={AccY?.ToString() ?? "null"}, " +
-                   $"Z={AccZ?.ToString() ?? "null"}) | " +
-                   $"HR={HeartRate} bpm | " +
-                   $"IBI={IBI_ms} ms | " +
-                   $"Participant={ParticipantId}";
+            return $"Row {RowIndex} | Timestamp: {TimestampMs} ms | " +
+                   $"PPG(G={PpgGreen ?? 0}, R={PpgRed ?? 0}, Ir={PpgIr ?? 0}) | " +
+                   $"ACC(X={AccX ?? 0}, Y={AccY ?? 0}, Z={AccZ ?? 0}) | " +
+                   $"HR={HeartRate} bpm | IBI={IBI_ms} ms | {ParticipantId}";
         }
-
     }
 }

@@ -1,12 +1,7 @@
-﻿using Contracts.Models;
+using Contracts.Models;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Contracts;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Server.Streams
 {
@@ -17,29 +12,24 @@ namespace Server.Streams
 
         public FileWriter(string sessionFilePath, string rejectsFilePath)
         {
-            this._sessionWriter = new StreamWriter(sessionFilePath, append: true);
-            this._rejectsWriter = new StreamWriter(rejectsFilePath, append: true);
+            _sessionWriter = new StreamWriter(sessionFilePath, append: true);
+            _rejectsWriter = new StreamWriter(rejectsFilePath, append: true);
 
-            // Reduce memory retained in buffers by flushing automatically
-            this._sessionWriter.AutoFlush = true;
-            this._rejectsWriter.AutoFlush = true;
+            _sessionWriter.AutoFlush = true;
+            _rejectsWriter.AutoFlush = true;
 
             if (new FileInfo(sessionFilePath).Length == 0)
-                this._sessionWriter.WriteLine("RowIndex,TimestampMs,PpgGreen,PpgRed,PpgIr,AccX,AccY,AccZ,HeartRate,IBI_ms");
+                _sessionWriter.WriteLine("RowIndex,TimestampMs,PpgGreen,PpgRed,PpgIr,AccX,AccY,AccZ,HeartRate,IBI_ms");
 
             if (new FileInfo(rejectsFilePath).Length == 0)
-                this._rejectsWriter.WriteLine("RowIndex,Reason,OriginalLine");
-
-            this._sessionWriter.Flush();
-            this._rejectsWriter.Flush();
+                _rejectsWriter.WriteLine("RowIndex,Reason,OriginalLine");
         }
 
         public void LogReject(string reason, PpgSample sample)
         {
             try
             {
-                this._rejectsWriter?.WriteLine($"{sample.RowIndex},{reason},{sample.ToString()}");
-                this._rejectsWriter?.Flush();
+                _rejectsWriter?.WriteLine($"{sample.RowIndex},{reason},{sample}");
             }
             catch (Exception ex) { Debug.WriteLine($"LogReject Error: {ex.Message}"); }
         }
@@ -48,19 +38,17 @@ namespace Server.Streams
         {
             try
             {
-                this._sessionWriter?.WriteLine(sample.ToString());
-                this._sessionWriter?.Flush();
+                _sessionWriter?.WriteLine(sample.ToString());
             }
-            catch (Exception ex) { Debug.WriteLine($"LogReject Error: {ex.Message}"); }
+            catch (Exception ex) { Debug.WriteLine($"LogToSession Error: {ex.Message}"); }
         }
 
         public void Dispose()
         {
-            this._sessionWriter?.Dispose();
-            this._rejectsWriter?.Dispose();
-            this._sessionWriter = null;
-            this._rejectsWriter = null;
+            _sessionWriter?.Dispose();
+            _rejectsWriter?.Dispose();
+            _sessionWriter = null;
+            _rejectsWriter = null;
         }
-
     }
 }

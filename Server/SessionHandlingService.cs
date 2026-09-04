@@ -1,61 +1,56 @@
-﻿using Contracts.Models;
+using Contracts.Models;
 using Contracts.Services;
 using Contracts.Utils;
-using Server.AnalyticHelpers;
 using Server.Streams;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.ServiceModel;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 
 namespace Server
 {
-    [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
+    [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single, ConcurrencyMode = ConcurrencyMode.Multiple)]
     public class SessionHandlingService : IPpgService, IDisposable
     {
-        // raised when the client channel closes/faults unexpectedly
-        public event EventHandler ClientDisconnected;
         public event EventHandler TransferStarted;
-        public event EventHandler SampleRecieved;
+        public event EventHandler SampleReceived;
         public event EventHandler OnTransferCompleted;
         public event EventHandler OnWarningRaised;
 
-        FileWriter fileWriter;
+        private FileWriter _fileWriter;
+        private readonly object _writeLock = new object();
 
-        public bool IsSessionActive { get; set; } = false;
+        public bool IsSessionActive { get; set; }
 
-        [OperationBehavior(AutoDisposeParameters = true)]
         public void StartSession(Meta metaData)
         {
             string rootPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"../../../"));
             string folderPath = Path.Combine(rootPath, "Data", metaData.ParticipantId, metaData.DeviceId, DateTime.Now.ToString("yyyy-MM-dd"));
 
-            try { Directory.CreateDirectory(folderPath); } 
+            try { Directory.CreateDirectory(folderPath); }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
 
             string sessionFilePath = Path.Combine(folderPath, "session.csv");
             string rejectsFilePath = Path.Combine(folderPath, "rejects.csv");
 
-            fileWriter?.Dispose(); // Dispose previous writer if exists
-            fileWriter = new FileWriter(sessionFilePath, rejectsFilePath);
+            lock (_writeLock)
+            {
+                _fileWriter?.Dispose();
+                _fileWriter = new FileWriter(sessionFilePath, rejectsFilePath);
+            }
 
-            this.IsSessionActive = true;
+            IsSessionActive = true;
             TransferStarted?.Invoke(metaData, EventArgs.Empty);
         }
 
-        [OperationBehavior(AutoDisposeParameters = true)]
         public void PushSample(PpgSample sample)
         {
             if (!PpgSampleValidator.ValidateSampleHR(sample))
             {
-                fileWriter.LogReject("HeartRate out of range", sample);
+                lock (_writeLock) { _fileWriter.LogReject("HeartRate out of range", sample); }
                 OnWarningRaised?.Invoke(sample, EventArgs.Empty);
-
                 throw new FaultException<ValidationFault>(
                     new ValidationFault("HeartRate out of range", sample),
                     new FaultReason("Validation failed"));
@@ -63,9 +58,8 @@ namespace Server
 
             if (!PpgSampleValidator.ValidateSampleIBI(sample))
             {
-                fileWriter.LogReject("IBI out of range", sample);
+                lock (_writeLock) { _fileWriter.LogReject("IBI out of range", sample); }
                 OnWarningRaised?.Invoke(sample, EventArgs.Empty);
-
                 throw new FaultException<ValidationFault>(
                     new ValidationFault("IBI out of range", sample),
                     new FaultReason("Validation failed"));
@@ -73,64 +67,92 @@ namespace Server
 
             if (!PpgSampleValidator.ValidateSamplePpg(sample))
             {
-                fileWriter.LogReject("Negative PPG channel value", sample);
+                lock (_writeLock) { _fileWriter.LogReject("Negative PPG channel value", sample); }
                 OnWarningRaised?.Invoke(sample, EventArgs.Empty);
-
                 throw new FaultException<DataFormatFault>(
                     new DataFormatFault("Negative PPG channel value", sample),
                     new FaultReason("Data format error"));
             }
 
-            fileWriter.LogToSession(sample);
-            SampleRecieved?.Invoke(sample, EventArgs.Empty); // Valid sample passed
+            lock (_writeLock) { _fileWriter.LogToSession(sample); }
+            SampleReceived?.Invoke(sample, EventArgs.Empty);
         }
 
-        [OperationBehavior(AutoDisposeParameters = true)]
+        public List<PpgSampleResult> PushSamples(List<PpgSample> samples)
+        {
+            var results = new List<PpgSampleResult>(samples.Count);
+
+            foreach (var sample in samples)
+            {
+                string reason = null;
+
+                if (!PpgSampleValidator.ValidateSampleHR(sample))
+                    reason = "HeartRate out of range";
+                else if (!PpgSampleValidator.ValidateSampleIBI(sample))
+                    reason = "IBI out of range";
+                else if (!PpgSampleValidator.ValidateSamplePpg(sample))
+                    reason = "Negative PPG channel value";
+
+                if (reason != null)
+                {
+                    lock (_writeLock) { _fileWriter.LogReject(reason, sample); }
+                    OnWarningRaised?.Invoke(sample, EventArgs.Empty);
+                    results.Add(new PpgSampleResult(sample.RowIndex, false, reason));
+                }
+                else
+                {
+                    lock (_writeLock) { _fileWriter.LogToSession(sample); }
+                    SampleReceived?.Invoke(sample, EventArgs.Empty);
+                    results.Add(new PpgSampleResult(sample.RowIndex, true));
+                }
+            }
+
+            return results;
+        }
+
         public void EndSession()
         {
             try
             {
-                this.IsSessionActive = false;
-                fileWriter?.Dispose();
+                IsSessionActive = false;
+                lock (_writeLock)
+                {
+                    _fileWriter?.Dispose();
+                    _fileWriter = null;
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("End Session Error: " + ex);
+                Debug.WriteLine("EndSession Error: " + ex);
             }
 
             try
             {
                 Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    try
-                    {
-                        OnTransferCompleted?.Invoke(null, EventArgs.Empty);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show(ex.Message);
-                    }
+                    try { OnTransferCompleted?.Invoke(null, EventArgs.Empty); }
+                    catch (Exception ex) { Debug.WriteLine(ex.Message); }
                 }));
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message);
+                Debug.WriteLine("EndSession Dispatcher Error: " + ex.Message);
             }
         }
 
         public void Dispose()
         {
-            fileWriter?.Dispose();
-            fileWriter = null;
+            lock (_writeLock)
+            {
+                _fileWriter?.Dispose();
+                _fileWriter = null;
+            }
 
-            this.IsSessionActive = false;
-
-            try { TransferStarted = null; } catch { }
-            try { SampleRecieved = null; } catch { }
-            try { OnTransferCompleted = null; } catch { }
-            try { OnWarningRaised = null; } catch { }
-            try { ClientDisconnected = null; } catch { }
+            IsSessionActive = false;
+            TransferStarted = null;
+            SampleReceived = null;
+            OnTransferCompleted = null;
+            OnWarningRaised = null;
         }
-
     }
 }
