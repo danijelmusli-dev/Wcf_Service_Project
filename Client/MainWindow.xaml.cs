@@ -74,7 +74,7 @@ namespace Wcf_Service_Project
                 PpgSamples.TrimExcess();
 
                 var stopwatch = Stopwatch.StartNew();
-                PpgSamples = PpgConverter.ConvertToPpgSamples(dir.DirName, "GalaxyWatch");
+                PpgSamples = PpgConverter.ConvertToPpgSamples(dir.DirName, "E4");
                 stopwatch.Stop();
 
                 CurrentDirectoryName = dir.DirName;
@@ -162,7 +162,7 @@ namespace Wcf_Service_Project
                         StartSessionBTN.IsEnabled = false;
                     });
 
-                    var metaData = new Meta(CurrentDirectoryName, "Galaxy Watch", PpgSamples[0], PpgSamples[1]);
+                    var metaData = new Meta(CurrentDirectoryName, "E4", PpgSamples[0], PpgSamples[1]);
                     _proxy.StartSession(metaData);
 
                     _sendIndex = 0;

@@ -1,45 +1,62 @@
 using Contracts.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 
 namespace Contracts.Utils
 {
     public static class PpgConverter
     {
-        public static PpgSample ConvertToOnePpgSample(string accLine, string hrLine, string ppgLine, string participantId, int rowIndex)
+        public static PpgSample ConvertToOnePpgSample(
+            string accLine, string hrLine, string bvpLine, string ibiLine,
+            string participantId, int rowIndex)
         {
             var sample = new PpgSample();
 
-            string[] accData = accLine.Split(',');
-            string[] hrData = hrLine.Split(new[] { ',' }, 4, StringSplitOptions.RemoveEmptyEntries);
-            string[] ibiData = hrLine.Split(new[] { '[' }, 2, StringSplitOptions.RemoveEmptyEntries)[1].Split(']');
-            string[] ppgData = ppgLine.Split(',');
+            try
+            {
+                // ACC.csv format: x,y,z,timestamp
+                string[] accData = accLine.Split(',');
+                sample.AccX = double.Parse(accData[0], CultureInfo.InvariantCulture);
+                sample.AccY = double.Parse(accData[1], CultureInfo.InvariantCulture);
+                sample.AccZ = double.Parse(accData[2], CultureInfo.InvariantCulture);
+                sample.TimestampMs = long.Parse(accData[3]) / 1000;
 
-            sample.TimestampMs = long.Parse(accData[1]);
+                // HR.csv format: value,timestamp
+                string[] hrData = hrLine.Split(',');
+                sample.HeartRate = (int)double.Parse(hrData[0], CultureInfo.InvariantCulture);
 
-            sample.PpgGreen = double.Parse(ppgData[2]);
-            sample.PpgRed = double.Parse(ppgData[3]);
-            sample.PpgIr = double.Parse(ppgData[4]);
+                // BVP.csv format: value,timestamp (single PPG channel)
+                string[] bvpData = bvpLine.Split(',');
+                double bvpValue = double.Parse(bvpData[0], CultureInfo.InvariantCulture);
+                sample.PpgGreen = bvpValue;
+                sample.PpgRed = bvpValue;
+                sample.PpgIr = bvpValue;
 
-            sample.AccX = double.Parse(accData[2]);
-            sample.AccY = double.Parse(accData[3]);
-            sample.AccZ = double.Parse(accData[4]);
+                // IBI.csv format: timestamp,duration
+                if (ibiLine != null)
+                {
+                    string[] ibiData = ibiLine.Split(',');
+                    if (ibiData.Length >= 2 && long.TryParse(ibiData[1], out long ibiDuration))
+                        sample.IBI_ms = (int)(ibiDuration / 1000);
+                    else
+                        sample.IBI_ms = 0;
+                }
+                else
+                {
+                    sample.IBI_ms = 0;
+                }
 
-            sample.HeartRate = int.Parse(hrData[2]);
-
-            var ibiValues = ibiData[0].Replace("\"", "").Replace("[", "").Replace("]", "")
-                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            var ibiStats = ibiData[1].Replace("\"", "").Replace("[", "").Replace("]", "")
-                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-            int lastIndex = Array.LastIndexOf(ibiStats, "0");
-            if (lastIndex >= 0 && lastIndex < ibiValues.Length && int.TryParse(ibiValues[lastIndex], out int res))
-                sample.IBI_ms = res;
-            else
-                sample.IBI_ms = 0;
-
-            sample.ParticipantId = participantId;
-            sample.RowIndex = rowIndex;
+                sample.ParticipantId = participantId;
+                sample.RowIndex = rowIndex;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Parse error at row {rowIndex}: {ex.Message}");
+                sample.ParticipantId = participantId;
+                sample.RowIndex = rowIndex;
+            }
 
             return sample;
         }
@@ -50,15 +67,19 @@ namespace Contracts.Utils
 
             var accLines = CsvReader.ExtractLines(participantId, deviceName, "ACC.csv");
             var hrLines = CsvReader.ExtractLines(participantId, deviceName, "HR.csv");
-            var ppgLines = CsvReader.ExtractLines(participantId, deviceName, "PPG.csv");
+            var bvpLines = CsvReader.ExtractLines(participantId, deviceName, "BVP.csv");
+            var ibiLines = CsvReader.ExtractLines(participantId, deviceName, "IBI.csv");
 
-            if (accLines is null || hrLines is null || ppgLines is null)
+            if (accLines is null || hrLines is null || bvpLines is null)
                 return samples;
 
-            int samplesNum = Math.Min(accLines.Count, Math.Min(hrLines.Count, ppgLines.Count));
+            int samplesNum = Math.Min(accLines.Count, Math.Min(hrLines.Count, bvpLines.Count));
 
             for (int i = 0; i < samplesNum; i++)
-                samples.Add(ConvertToOnePpgSample(accLines[i], hrLines[i], ppgLines[i], participantId, i));
+            {
+                string ibiLine = (ibiLines != null && i < ibiLines.Count) ? ibiLines[i] : null;
+                samples.Add(ConvertToOnePpgSample(accLines[i], hrLines[i], bvpLines[i], ibiLine, participantId, i));
+            }
 
             return samples;
         }
