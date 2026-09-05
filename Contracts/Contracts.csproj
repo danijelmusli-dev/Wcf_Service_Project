@@ -69,7 +69,7 @@
       <DependentUpon>LabelProgressBar.xaml</DependentUpon>
     </Compile>
     <Compile Include="Utils\CsvReader.cs" />
-    <Compile Include="Utils\Logger.cs" />
+    <Compile Include="Models\PpgSampleResult.cs" />
     <Compile Include="Utils\PpgConverter.cs" />
     <Compile Include="Utils\PpgSampleValidator.cs" />
   </ItemGroup>

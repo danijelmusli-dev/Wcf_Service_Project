@@ -1,75 +1,80 @@
-﻿using Contracts.Models;
+using Contracts.Models;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Globalization;
 
 namespace Contracts.Utils
 {
     public static class PpgConverter
     {
-
-        public static PpgSample ConvertToOnePpgSample(string accLine, string hrLine, string ppgLine, string participantId, int rowIndex)
+        public static PpgSample ConvertToOnePpgSample(
+            string accLine, string hrLine, string bvpLine, string ibiLine,
+            string participantId, int rowIndex)
         {
-            PpgSample sample = new PpgSample();
+            var sample = new PpgSample { ParticipantId = participantId, RowIndex = rowIndex };
 
-            string[] accData = accLine.Split(',');
-            string[] hrData = hrLine.Split(new char[] { ',' }, 4, StringSplitOptions.RemoveEmptyEntries);
-            string[] ibiData = hrLine.Split(new char[] { '[' }, 2, StringSplitOptions.RemoveEmptyEntries)[1].Split(']');
-            string[] ppgData = ppgLine.Split(',');
-
-            sample.TimestampMs = long.Parse(accData[1]);
-
-            sample.PpgGreen = double.Parse(ppgData[2]);
-            sample.PpgRed = double.Parse(ppgData[2]);
-            sample.PpgIr = double.Parse(ppgData[2]);
-
-            sample.AccX = double.Parse(accData[2]);
-            sample.AccY = double.Parse(accData[3]);
-            sample.AccZ = double.Parse(accData[4]);
-
-            sample.HeartRate = int.Parse(hrData[2]);
-
-            List<string> ibiValues = ibiData[0].Replace("\"", "").Replace("[", "").Replace("]", "").Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList();
-            List<string> ibiStats = ibiData[1].Replace("\"", "").Replace("[", "").Replace("]", "").Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList();
-
-            //  We are looking for last valid Ibi singal
-            // "[662,639,651,709,733,736,740,753]"
-            // "[0,0,0,0,0,0,0,0,0] => 753 is the last valid value
-
-            int lastIndex = ibiStats.LastIndexOf("0");
-            if (lastIndex >= 0 && int.TryParse(ibiValues[lastIndex], out int res))
+            try
             {
-                sample.IBI_ms = res;
-            }
-            else { sample.IBI_ms = 0; }
+                // ACC.csv format: x,y,z,timestamp
+                string[] accData = accLine.Split(',');
+                if (accData.Length < 4) throw new FormatException($"ACC line has {accData.Length} columns, expected 4");
+                sample.AccX = double.Parse(accData[0], CultureInfo.InvariantCulture);
+                sample.AccY = double.Parse(accData[1], CultureInfo.InvariantCulture);
+                sample.AccZ = double.Parse(accData[2], CultureInfo.InvariantCulture);
+                sample.TimestampMs = long.Parse(accData[3]) / 1000;
 
-            sample.ParticipantId = participantId;
-            sample.RowIndex = rowIndex;
+                // HR.csv format: value,timestamp
+                string[] hrData = hrLine.Split(',');
+                if (hrData.Length < 1) throw new FormatException("HR line is empty");
+                sample.HeartRate = (int)double.Parse(hrData[0], CultureInfo.InvariantCulture);
+
+                // BVP.csv format: value,timestamp (single PPG channel, E4 BVP is differential)
+                string[] bvpData = bvpLine.Split(',');
+                if (bvpData.Length < 1) throw new FormatException("BVP line is empty");
+                double bvpValue = double.Parse(bvpData[0], CultureInfo.InvariantCulture);
+                sample.PpgGreen = bvpValue;
+                sample.PpgRed = bvpValue;
+                sample.PpgIr = bvpValue;
+
+                // E4 IBI.csv: each line is a single float value in seconds
+                if (ibiLine != null && double.TryParse(ibiLine.Trim(), System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out double ibiSeconds))
+                    sample.IBI_ms = (int)(ibiSeconds * 1000);
+                else
+                    sample.IBI_ms = 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Parse error at row {rowIndex}: {ex.Message}");
+            }
 
             return sample;
         }
 
         public static List<PpgSample> ConvertToPpgSamples(string participantId, string deviceName)
         {
-            List<PpgSample> samples = new List<PpgSample>();
+            List<string> accLines, hrLines, bvpLines;
 
-            List<string> accLines = CsvReader.ExtractLines(participantId, deviceName, "ACC.csv");
-            List<string> hrLines = CsvReader.ExtractLines(participantId, deviceName, "HR.csv");
-            List<string> ppgLines = CsvReader.ExtractLines(participantId, deviceName, "PPG.csv");
+            try { accLines = CsvReader.ExtractLines(participantId, deviceName, "ACC.csv"); }
+            catch (Exception ex) { throw new InvalidOperationException($"Failed to load ACC.csv: {ex.Message}", ex); }
 
-            if (accLines is null || hrLines is null || ppgLines is null)
-            {
-                return samples;
-            }
+            try { hrLines = CsvReader.ExtractLines(participantId, deviceName, "HR.csv"); }
+            catch (Exception ex) { throw new InvalidOperationException($"Failed to load HR.csv: {ex.Message}", ex); }
 
-            int samplesNum = Math.Min(accLines.Count, Math.Min(hrLines.Count, ppgLines.Count));
+            try { bvpLines = CsvReader.ExtractLines(participantId, deviceName, "BVP.csv"); }
+            catch (Exception ex) { throw new InvalidOperationException($"Failed to load BVP.csv: {ex.Message}", ex); }
+
+            List<string> ibiLines = null;
+            try { ibiLines = CsvReader.ExtractLines(participantId, deviceName, "IBI.csv"); }
+            catch { /* IBI is optional */ }
+
+            var samples = new List<PpgSample>();
+            int samplesNum = Math.Min(accLines.Count, Math.Min(hrLines.Count, bvpLines.Count));
 
             for (int i = 0; i < samplesNum; i++)
             {
-                PpgSample sample = ConvertToOnePpgSample(accLines[i], hrLines[i], ppgLines[i], participantId, i);
-                samples.Add(sample);
+                string ibiLine = (ibiLines != null && i < ibiLines.Count) ? ibiLines[i] : null;
+                samples.Add(ConvertToOnePpgSample(accLines[i], hrLines[i], bvpLines[i], ibiLine, participantId, i));
             }
 
             return samples;

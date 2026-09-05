@@ -107,7 +107,9 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Resource Include="MainWindow.cs.bak.txt" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Contracts\Contracts.csproj">
       <Project>{fb891654-d267-478b-b2a7-409dc6f7cef8}</Project>

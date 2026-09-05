@@ -1,11 +1,7 @@
-﻿using Contracts.Models;
+using Contracts.Models;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics.Contracts;
+using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Server.Streams
 {
@@ -16,36 +12,54 @@ namespace Server.Streams
 
         public FileWriter(string sessionFilePath, string rejectsFilePath)
         {
-            _sessionWriter = new StreamWriter(sessionFilePath, append: true);
-            _rejectsWriter = new StreamWriter(rejectsFilePath, append: true);
+            try
+            {
+                _sessionWriter = new StreamWriter(sessionFilePath, append: true);
+                _rejectsWriter = new StreamWriter(rejectsFilePath, append: true);
+            }
+            catch
+            {
+                _sessionWriter?.Dispose();
+                throw;
+            }
+
+            _sessionWriter.AutoFlush = true;
+            _rejectsWriter.AutoFlush = true;
 
             if (new FileInfo(sessionFilePath).Length == 0)
                 _sessionWriter.WriteLine("RowIndex,TimestampMs,PpgGreen,PpgRed,PpgIr,AccX,AccY,AccZ,HeartRate,IBI_ms");
 
             if (new FileInfo(rejectsFilePath).Length == 0)
                 _rejectsWriter.WriteLine("RowIndex,Reason,OriginalLine");
-
-            _sessionWriter.Flush();
-            _rejectsWriter.Flush();
         }
 
         public void LogReject(string reason, PpgSample sample)
         {
-            _rejectsWriter.WriteLine($"{sample.RowIndex},{reason},{sample.ToString()}");
-            _rejectsWriter.Flush();
+            try
+            {
+                // Quote fields that may contain commas
+                string safeReason = $"\"{reason}\"";
+                string safeSample = $"\"{sample?.ToString()?.Replace("\"", "\"\"")}\"";
+                _rejectsWriter?.WriteLine($"{sample?.RowIndex ?? 0},{safeReason},{safeSample}");
+            }
+            catch (Exception ex) { Debug.WriteLine($"LogReject Error: {ex.Message}"); }
         }
 
         public void LogToSession(PpgSample sample)
         {
-            _sessionWriter.WriteLine(sample.ToString());
-            _sessionWriter.Flush();
+            try
+            {
+                _sessionWriter?.WriteLine(sample.ToString());
+            }
+            catch (Exception ex) { Debug.WriteLine($"LogToSession Error: {ex.Message}"); }
         }
 
-        public void Dispose() 
+        public void Dispose()
         {
-            this._sessionWriter?.Dispose();
-            this._rejectsWriter?.Dispose();
+            _sessionWriter?.Dispose();
+            _rejectsWriter?.Dispose();
+            _sessionWriter = null;
+            _rejectsWriter = null;
         }
-
     }
 }

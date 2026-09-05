@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" Version="4.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference built Contracts DLL to avoid WPF project build complications -->
+    <Reference Include="Contracts">
+      <HintPath>..\Contracts\bin\Debug\Contracts.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

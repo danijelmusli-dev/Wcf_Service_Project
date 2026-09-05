@@ -1,9 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Contracts.Utils
 {
@@ -11,31 +8,28 @@ namespace Contracts.Utils
     {
         public static List<string> ExtractLines(string directoryName, string deviceDirectoryName, string fileName)
         {
-            DirectoryInfo directoryInfo = new DirectoryInfo(directoryName);
             string root = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"../../../Dataset");
             string path = Path.Combine(root, directoryName, deviceDirectoryName, fileName);
             string fullPath = Path.GetFullPath(path);
 
-            List<string> lines = new List<string>();
+            var lines = new List<string>();
             try
             {
-                using (StreamReader sr = new StreamReader(fullPath))
+                using (var sr = new StreamReader(fullPath))
                 {
                     while (!sr.EndOfStream)
-                    {
                         lines.Add(sr.ReadLine());
-                    }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                return null;
+                throw new IOException($"Cannot read '{fullPath}': {ex.Message}", ex);
             }
 
-            // skipping the csv header
-            lines.RemoveAt(0);
+            if (lines.Count > 0)
+                lines.RemoveAt(0);
+
             return lines;
         }
-
     }
 }

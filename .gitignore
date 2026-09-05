@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Generated session output files (written by server at runtime)
+Data/**/session.csv
+Data/**/rejects.csv
