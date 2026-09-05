@@ -79,8 +79,9 @@ namespace Wcf_Service_Project
                 SessionInfoTB.Text = "Loading...";
                 SessionInfoTB.Foreground = Brushes.DarkOrange;
 
+                string dirName = dir.DirName;
                 var stopwatch = Stopwatch.StartNew();
-                List<PpgSample> loaded = await Task.Run(() => PpgConverter.ConvertToPpgSamples(dir.DirName, "E4"));
+                List<PpgSample> loaded = await Task.Run(() => PpgConverter.ConvertToPpgSamples(dirName, "E4"));
                 stopwatch.Stop();
 
                 PpgSamples = loaded;
