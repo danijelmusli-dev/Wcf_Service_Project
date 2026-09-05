@@ -12,8 +12,16 @@ namespace Server.Streams
 
         public FileWriter(string sessionFilePath, string rejectsFilePath)
         {
-            _sessionWriter = new StreamWriter(sessionFilePath, append: true);
-            _rejectsWriter = new StreamWriter(rejectsFilePath, append: true);
+            try
+            {
+                _sessionWriter = new StreamWriter(sessionFilePath, append: true);
+                _rejectsWriter = new StreamWriter(rejectsFilePath, append: true);
+            }
+            catch
+            {
+                _sessionWriter?.Dispose();
+                throw;
+            }
 
             _sessionWriter.AutoFlush = true;
             _rejectsWriter.AutoFlush = true;
@@ -29,7 +37,10 @@ namespace Server.Streams
         {
             try
             {
-                _rejectsWriter?.WriteLine($"{sample.RowIndex},{reason},{sample}");
+                // Quote fields that may contain commas
+                string safeReason = $"\"{reason}\"";
+                string safeSample = $"\"{sample?.ToString()?.Replace("\"", "\"\"")}\"";
+                _rejectsWriter?.WriteLine($"{sample?.RowIndex ?? 0},{safeReason},{safeSample}");
             }
             catch (Exception ex) { Debug.WriteLine($"LogReject Error: {ex.Message}"); }
         }

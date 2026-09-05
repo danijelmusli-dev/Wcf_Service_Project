@@ -3,6 +3,7 @@ using Server.AnalyticHelpers;
 using System;
 using System.Diagnostics;
 using System.ServiceModel;
+using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -71,6 +72,9 @@ namespace Server
                 MessageBox.Show(ex.Message);
                 Host?.Abort();
                 Host = null;
+                UnsubscribeFromEvents();
+                _service?.Dispose();
+                _service = null;
             }
         }
 
@@ -91,7 +95,7 @@ namespace Server
                         Host = null;
 
                         UnsubscribeFromEvents();
-                        _service.Dispose();
+                        _service?.Dispose();
                         _service = null;
                     }
 
@@ -117,8 +121,18 @@ namespace Server
         {
             SafeInvokeUIAsync(() =>
             {
-                EventsTB.Text += "Client disconnected unexpectedly.\n";
+                AppendEvent("Client disconnected unexpectedly.");
             });
+
+            // M-6: snapshot and clear _service before StopServer to prevent use-after-dispose race
+            SessionHandlingService svc;
+            lock (_serverLock)
+            {
+                svc = _service;
+                _service = null;
+            }
+            svc?.Dispose();
+
             StopServer();
         }
 
@@ -130,7 +144,7 @@ namespace Server
 
             SafeInvokeUIAsync(() =>
             {
-                EventsTB.Text += "Transfer Started!\n";
+                AppendEvent("Transfer Started!");
                 if (sender is Meta meta)
                     MetaDataLV.Items.Add(meta);
             });
@@ -149,7 +163,7 @@ namespace Server
                 curr = _currSample;
             }
 
-            _receivedCount++;
+            Interlocked.Increment(ref _receivedCount);
             _analytics.AnalyzePpgSample(prev, curr);
 
             if (_receivedCount % 100 == 0)
@@ -167,7 +181,7 @@ namespace Server
             int received = _receivedCount;
             SafeInvokeUIAsync(() =>
             {
-                EventsTB.Text += "Transfer Completed!\n";
+                AppendEvent("Transfer Completed!");
                 IncomingRowsTB.Text = $"Received: {received} (Done)";
             });
             // Server stays running — ready for next session
@@ -175,7 +189,7 @@ namespace Server
 
         private void OnWarningRaised(object sender, EventArgs e)
         {
-            _rejectedCount++;
+            Interlocked.Increment(ref _rejectedCount);
             int rejected = _rejectedCount;
             SafeInvokeUIAsync(() =>
             {
@@ -212,11 +226,20 @@ namespace Server
 
         private void OnWeakPpgWarning(object sender, PpgSample sample)
         {
-            int count = _analytics.WeakPpgWarningCount;
             SafeInvokeUIAsync(() =>
             {
-                EventsTB.Text += $"Weak PPG signal at row {sample.RowIndex}\n";
+                AppendEvent($"Weak PPG signal at row {sample.RowIndex}");
             });
+        }
+
+        private void AppendEvent(string message)
+        {
+            const int MaxLines = 200;
+            var text = EventsTB.Text + message + "\n";
+            var lines = text.Split('\n');
+            if (lines.Length > MaxLines)
+                text = string.Join("\n", lines, lines.Length - MaxLines, MaxLines);
+            EventsTB.Text = text;
         }
 
         private Task SafeInvokeUIAsync(Action action, DispatcherPriority priority = DispatcherPriority.Normal)

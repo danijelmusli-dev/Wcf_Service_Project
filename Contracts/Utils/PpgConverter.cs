@@ -12,12 +12,13 @@ namespace Contracts.Utils
             string accLine, string hrLine, string bvpLine, string ibiLine,
             string participantId, int rowIndex)
         {
-            var sample = new PpgSample();
+            var sample = new PpgSample { ParticipantId = participantId, RowIndex = rowIndex };
 
             try
             {
                 // ACC.csv format: x,y,z,timestamp
                 string[] accData = accLine.Split(',');
+                if (accData.Length < 4) throw new FormatException($"ACC line has {accData.Length} columns, expected 4");
                 sample.AccX = double.Parse(accData[0], CultureInfo.InvariantCulture);
                 sample.AccY = double.Parse(accData[1], CultureInfo.InvariantCulture);
                 sample.AccZ = double.Parse(accData[2], CultureInfo.InvariantCulture);
@@ -25,10 +26,12 @@ namespace Contracts.Utils
 
                 // HR.csv format: value,timestamp
                 string[] hrData = hrLine.Split(',');
+                if (hrData.Length < 1) throw new FormatException("HR line is empty");
                 sample.HeartRate = (int)double.Parse(hrData[0], CultureInfo.InvariantCulture);
 
-                // BVP.csv format: value,timestamp (single PPG channel)
+                // BVP.csv format: value,timestamp (single PPG channel, E4 BVP is differential)
                 string[] bvpData = bvpLine.Split(',');
+                if (bvpData.Length < 1) throw new FormatException("BVP line is empty");
                 double bvpValue = double.Parse(bvpData[0], CultureInfo.InvariantCulture);
                 sample.PpgGreen = bvpValue;
                 sample.PpgRed = bvpValue;
@@ -39,15 +42,10 @@ namespace Contracts.Utils
                     sample.IBI_ms = (int)(ibiSeconds * 1000);
                 else
                     sample.IBI_ms = 0;
-
-                sample.ParticipantId = participantId;
-                sample.RowIndex = rowIndex;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Parse error at row {rowIndex}: {ex.Message}");
-                sample.ParticipantId = participantId;
-                sample.RowIndex = rowIndex;
             }
 
             return sample;
@@ -55,16 +53,22 @@ namespace Contracts.Utils
 
         public static List<PpgSample> ConvertToPpgSamples(string participantId, string deviceName)
         {
+            List<string> accLines, hrLines, bvpLines;
+
+            try { accLines = CsvReader.ExtractLines(participantId, deviceName, "ACC.csv"); }
+            catch (Exception ex) { throw new InvalidOperationException($"Failed to load ACC.csv: {ex.Message}", ex); }
+
+            try { hrLines = CsvReader.ExtractLines(participantId, deviceName, "HR.csv"); }
+            catch (Exception ex) { throw new InvalidOperationException($"Failed to load HR.csv: {ex.Message}", ex); }
+
+            try { bvpLines = CsvReader.ExtractLines(participantId, deviceName, "BVP.csv"); }
+            catch (Exception ex) { throw new InvalidOperationException($"Failed to load BVP.csv: {ex.Message}", ex); }
+
+            List<string> ibiLines = null;
+            try { ibiLines = CsvReader.ExtractLines(participantId, deviceName, "IBI.csv"); }
+            catch { /* IBI is optional */ }
+
             var samples = new List<PpgSample>();
-
-            var accLines = CsvReader.ExtractLines(participantId, deviceName, "ACC.csv");
-            var hrLines = CsvReader.ExtractLines(participantId, deviceName, "HR.csv");
-            var bvpLines = CsvReader.ExtractLines(participantId, deviceName, "BVP.csv");
-            var ibiLines = CsvReader.ExtractLines(participantId, deviceName, "IBI.csv");
-
-            if (accLines is null || hrLines is null || bvpLines is null)
-                return samples;
-
             int samplesNum = Math.Min(accLines.Count, Math.Min(hrLines.Count, bvpLines.Count));
 
             for (int i = 0; i < samplesNum; i++)

@@ -16,6 +16,8 @@ namespace Contracts.Services
         void PushSample(PpgSample sample);
 
         [OperationContract]
+        [FaultContract(typeof(ValidationFault))]
+        [FaultContract(typeof(DataFormatFault))]
         List<PpgSampleResult> PushSamples(List<PpgSample> samples);
 
         [OperationContract(IsOneWay = true)]

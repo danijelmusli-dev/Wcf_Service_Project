@@ -24,7 +24,7 @@ namespace Wcf_Service_Project
         private bool IsSessionStarted { get; set; }
         private List<PpgSample> PpgSamples { get; set; } = new List<PpgSample>();
         private string CurrentDirectoryName { get; set; } = string.Empty;
-        private int BatchSize { get; set; } = int.Parse(ConfigurationManager.AppSettings["BatchSize"]);
+        private int BatchSize { get; set; } = int.TryParse(ConfigurationManager.AppSettings["BatchSize"], out int bs) ? bs : 500;
         private ExceptionHandler ExceptionHandling { get; set; } = new ExceptionHandler();
 
         private int _sendIndex;
@@ -73,32 +73,31 @@ namespace Wcf_Service_Project
                 PpgSamples.Clear();
                 PpgSamples.TrimExcess();
 
-                var stopwatch = Stopwatch.StartNew();
-                PpgSamples = PpgConverter.ConvertToPpgSamples(dir.DirName, "E4");
-                stopwatch.Stop();
-
                 CurrentDirectoryName = dir.DirName;
-
                 LoadingDirPB.Value = 0;
                 LoadingDirPB.Maximum = 100;
-                for (int i = 0; i <= 100; i++)
-                {
-                    LoadingDirPB.Value = i;
-                    await Task.Delay(1);
-                }
+                SessionInfoTB.Text = "Loading...";
+                SessionInfoTB.Foreground = Brushes.DarkOrange;
+
+                var stopwatch = Stopwatch.StartNew();
+                List<PpgSample> loaded = await Task.Run(() => PpgConverter.ConvertToPpgSamples(dir.DirName, "E4"));
+                stopwatch.Stop();
+
+                PpgSamples = loaded;
+                LoadingDirPB.Value = 100;
 
                 SessionInfoTB.Text = "Data Loaded";
                 SessionInfoTB.Foreground = Brushes.Green;
                 RowNumInfoTB.Text = $"Rows Loaded: {PpgSamples.Count}";
                 LoadingTimeInfoTB.Text = $"Loading time: {stopwatch.Elapsed.TotalMilliseconds:F0} ms";
 
-                LoadedRowsTB.Text = string.Empty;
                 int range = Math.Min(30, PpgSamples.Count);
+                var sb = new System.Text.StringBuilder();
                 foreach (var sample in PpgSamples.GetRange(0, range))
-                    LoadedRowsTB.Text += sample + "\n";
-
+                    sb.AppendLine(sample.ToString());
                 if (PpgSamples.Count > 30)
-                    LoadedRowsTB.Text += "..........";
+                    sb.AppendLine("..........");
+                LoadedRowsTB.Text = sb.ToString();
             }
             catch (Exception ex)
             {
@@ -237,7 +236,7 @@ namespace Wcf_Service_Project
                         StartSessionBTN.IsEnabled = true;
                     });
 
-                    ExceptionHandling.Dispose();
+                    ExceptionHandling.Reset();
                     PpgSamples.Clear();
                     PpgSamples.TrimExcess();
                     _sendIndex = 0;
@@ -276,17 +275,19 @@ namespace Wcf_Service_Project
 
             e.Cancel = true;
 
-            try { _proxy?.EndSession(); } catch { }
-            try { _sessionCts?.Cancel(); } catch { }
-            try { await Task.WhenAny(_sessionTask ?? Task.CompletedTask, Task.Delay(2000)); } catch { }
+            // Snapshot fields before the background task's finally block can null them
+            var proxy = _proxy;
+            var cts = _sessionCts;
+            var task = _sessionTask;
+            var channel = _clientChannel;
+            var factory = _factory;
 
-            SafeClose(_clientChannel);
-            SafeClose(_factory);
+            try { proxy?.EndSession(); } catch { }
+            try { cts?.Cancel(); } catch { }
+            try { await Task.WhenAny(task ?? Task.CompletedTask, Task.Delay(2000)); } catch { }
 
-            IsSessionStarted = false;
-            _proxy = null;
-            _clientChannel = null;
-            _factory = null;
+            SafeClose(channel);
+            SafeClose(factory);
 
             Application.Current.Shutdown();
         }

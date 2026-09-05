@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 
 namespace Contracts.Utils
@@ -24,8 +23,7 @@ namespace Contracts.Utils
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CsvReader Error: {ex.Message} - Path: {fullPath}");
-                return null;
+                throw new IOException($"Cannot read '{fullPath}': {ex.Message}", ex);
             }
 
             if (lines.Count > 0)

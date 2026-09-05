@@ -1,10 +1,9 @@
 using Contracts.Models;
-using System;
 using System.ServiceModel;
 
 namespace Wcf_Service_Project.Utils
 {
-    public class ExceptionHandler : IDisposable
+    public class ExceptionHandler
     {
         public int ValidationFaultCount { get; set; }
         public int DataFormatFaultCount { get; set; }
@@ -40,11 +39,6 @@ namespace Wcf_Service_Project.Utils
             ValidationFaultCount = 0;
             DataFormatFaultCount = 0;
             OtherFaultCount = 0;
-        }
-
-        public void Dispose()
-        {
-            Reset();
         }
     }
 }
