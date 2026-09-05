@@ -26,6 +26,8 @@ namespace Server
         private readonly object _sampleLock = new object();
         private readonly object _serverLock = new object();
 
+        private int _lastWarningUiTick;
+
         private readonly ConcurrentQueue<(PpgSample Prev, PpgSample Curr)> _analyticsQueue =
             new ConcurrentQueue<(PpgSample, PpgSample)>();
         private CancellationTokenSource _analyticsCts;
@@ -79,10 +81,10 @@ namespace Server
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
-                _analyticsCts?.Cancel();
-                _analyticsCts?.Dispose();
+                var cts = _analyticsCts;
                 _analyticsCts = null;
                 _analyticsTask = null;
+                try { cts?.Cancel(); cts?.Dispose(); } catch { }
                 Host?.Abort();
                 Host = null;
                 UnsubscribeFromEvents();
@@ -93,14 +95,15 @@ namespace Server
 
         private void StopServer()
         {
-            _analyticsCts?.Cancel();
-            try { _analyticsTask?.Wait(500); } catch { }
-            _analyticsCts?.Dispose();
-            _analyticsCts = null;
-            _analyticsTask = null;
-
             lock (_serverLock)
             {
+                // Cancel analytics drain under lock — prevents concurrent StopServer race
+                // (UI thread via Stop button and WCF thread via OnHostFaulted can both call StopServer)
+                var cts = _analyticsCts;
+                _analyticsCts = null;
+                _analyticsTask = null;
+                try { cts?.Cancel(); cts?.Dispose(); } catch { }
+
                 try
                 {
                     if (Host != null)
@@ -158,8 +161,8 @@ namespace Server
         private void OnTransferStarted(object sender, EventArgs e)
         {
             _analytics.ResetWarningCounts();
-            _receivedCount = 0;
-            _rejectedCount = 0;
+            Interlocked.Exchange(ref _receivedCount, 0);
+            Interlocked.Exchange(ref _rejectedCount, 0);
 
             SafeInvokeUIAsync(() =>
             {
@@ -224,11 +227,12 @@ namespace Server
         private void OnWarningRaised(object sender, EventArgs e)
         {
             Interlocked.Increment(ref _rejectedCount);
+            // Throttle: one UI update per 200 ms — prevents dispatcher flooding under high rejection rates
+            int now = Environment.TickCount;
+            if (unchecked(now - _lastWarningUiTick) < 200) return;
+            _lastWarningUiTick = now;
             int rejected = _rejectedCount;
-            SafeInvokeUIAsync(() =>
-            {
-                RejectedCSVTB.Text = $"Total rejected: {rejected}";
-            });
+            SafeInvokeUIAsync(() => RejectedCSVTB.Text = $"Total rejected: {rejected}");
         }
 
         private void OnHrOutOfRangeWarning(object sender, PpgSample sample)

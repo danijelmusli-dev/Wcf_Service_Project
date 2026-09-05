@@ -131,8 +131,19 @@ namespace Wcf_Service_Project
                 return;
             }
 
+            // Set synchronously on UI thread — prevents double-click double-session race
+            IsSessionStarted = true;
+            StartSessionBTN.IsEnabled = false;
+            SessionInfoTB.Text = "Connecting...";
+            SessionInfoTB.Foreground = Brushes.DarkOrange;
+
+            // Snapshot UI-thread-owned values before entering background task
+            string participantId = CurrentDirectoryName;
+            var samples = PpgSamples;
+
             _sessionCts = new CancellationTokenSource();
             var token = _sessionCts.Token;
+            var cts = _sessionCts;
 
             await (_sessionTask = Task.Run(async () =>
             {
@@ -142,11 +153,7 @@ namespace Wcf_Service_Project
 
                 try
                 {
-                    _factory = new ChannelFactory<IPpgService>("SessionHandlingService");
-                    _proxy = _factory.CreateChannel();
-                    _clientChannel = _proxy as IClientChannel;
-
-                    if (PpgSamples.Count < 2)
+                    if (samples.Count < 2)
                     {
                         await SafeInvokeUIAsync(() =>
                         {
@@ -156,17 +163,15 @@ namespace Wcf_Service_Project
                         return;
                     }
 
-                    await SafeInvokeUIAsync(() =>
-                    {
-                        IsSessionStarted = true;
-                        StartSessionBTN.IsEnabled = false;
-                    });
+                    _factory = new ChannelFactory<IPpgService>("SessionHandlingService");
+                    _proxy = _factory.CreateChannel();
+                    _clientChannel = _proxy as IClientChannel;
 
-                    var metaData = new Meta(CurrentDirectoryName, "E4", PpgSamples[0], PpgSamples[1]);
+                    var metaData = new Meta(participantId, "E4", samples[0], samples[1]);
                     _proxy.StartSession(metaData);
 
                     _sendIndex = 0;
-                    _totalSamples = PpgSamples.Count;
+                    _totalSamples = samples.Count;
 
                     await SafeInvokeUIAsync(() =>
                     {
@@ -182,7 +187,7 @@ namespace Wcf_Service_Project
                         if (token.IsCancellationRequested) break;
 
                         int count = Math.Min(BatchSize, _totalSamples - _sendIndex);
-                        var batch = PpgSamples.GetRange(_sendIndex, count);
+                        var batch = samples.GetRange(_sendIndex, count);
 
                         var results = _proxy.PushSamples(batch);
                         foreach (var result in results)
@@ -193,7 +198,6 @@ namespace Wcf_Service_Project
 
                         _sendIndex += count;
 
-                        // Throttle UI updates to avoid flooding dispatcher
                         if (uiSw.ElapsedMilliseconds >= 200 || _sendIndex >= _totalSamples)
                         {
                             uiSw.Restart();
@@ -212,20 +216,31 @@ namespace Wcf_Service_Project
                     try { _proxy?.EndSession(); }
                     catch (Exception ex) { Debug.WriteLine($"EndSession Error: {ex.Message}"); }
 
-                    SafeClose(_clientChannel);
-                    SafeClose(_factory);
-
                     await SafeInvokeUIAsync(() =>
                     {
                         SessionInfoTB.Text = "Session Completed";
                         SessionInfoTB.Foreground = Brushes.Green;
                     });
                 }
+                catch (EndpointNotFoundException)
+                {
+                    await SafeInvokeUIAsync(() =>
+                    {
+                        SessionInfoTB.Text = "Server not reachable — is the server running?";
+                        SessionInfoTB.Foreground = Brushes.DarkRed;
+                    });
+                }
+                catch (CommunicationException ex)
+                {
+                    await SafeInvokeUIAsync(() =>
+                    {
+                        Debug.WriteLine($"CommunicationException: {ex.Message}");
+                        SessionInfoTB.Text = "Connection lost — session aborted";
+                        SessionInfoTB.Foreground = Brushes.DarkRed;
+                    });
+                }
                 catch (Exception ex)
                 {
-                    SafeClose(_clientChannel);
-                    SafeClose(_factory);
-
                     await SafeInvokeUIAsync(() =>
                     {
                         Debug.WriteLine(ex.Message);
@@ -235,22 +250,25 @@ namespace Wcf_Service_Project
                 }
                 finally
                 {
+                    // SafeClose covers all exit paths including early return and exceptions
+                    SafeClose(_clientChannel);
+                    SafeClose(_factory);
+
                     await SafeInvokeUIAsync(() =>
                     {
+                        // Clear samples before re-enabling — prevents DataDirectory race
+                        PpgSamples = new List<PpgSample>();
                         IsSessionStarted = false;
                         StartSessionBTN.IsEnabled = true;
                     });
 
                     ExceptionHandling.Reset();
-                    PpgSamples.Clear();
-                    PpgSamples.TrimExcess();
                     _sendIndex = 0;
                     _totalSamples = 0;
-
                     _proxy = null;
                     _clientChannel = null;
                     _factory = null;
-                    _sessionCts?.Dispose();
+                    cts?.Dispose();
                     _sessionCts = null;
                 }
             }, token));
