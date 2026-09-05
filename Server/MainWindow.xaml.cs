@@ -1,6 +1,7 @@
 using Contracts.Models;
 using Server.AnalyticHelpers;
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.ServiceModel;
 using System.Threading;
@@ -24,6 +25,11 @@ namespace Server
 
         private readonly object _sampleLock = new object();
         private readonly object _serverLock = new object();
+
+        private readonly ConcurrentQueue<(PpgSample Prev, PpgSample Curr)> _analyticsQueue =
+            new ConcurrentQueue<(PpgSample, PpgSample)>();
+        private CancellationTokenSource _analyticsCts;
+        private Task _analyticsTask;
 
         public MainWindow()
         {
@@ -52,6 +58,9 @@ namespace Server
         {
             try
             {
+                _analyticsCts = new CancellationTokenSource();
+                _analyticsTask = DrainAnalyticsAsync(_analyticsCts.Token);
+
                 _service = new SessionHandlingService();
                 SubscribeToEvents();
 
@@ -70,6 +79,10 @@ namespace Server
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message);
+                _analyticsCts?.Cancel();
+                _analyticsCts?.Dispose();
+                _analyticsCts = null;
+                _analyticsTask = null;
                 Host?.Abort();
                 Host = null;
                 UnsubscribeFromEvents();
@@ -80,6 +93,12 @@ namespace Server
 
         private void StopServer()
         {
+            _analyticsCts?.Cancel();
+            try { _analyticsTask?.Wait(500); } catch { }
+            _analyticsCts?.Dispose();
+            _analyticsCts = null;
+            _analyticsTask = null;
+
             lock (_serverLock)
             {
                 try
@@ -163,16 +182,31 @@ namespace Server
                 curr = _currSample;
             }
 
-            Interlocked.Increment(ref _receivedCount);
-            _analytics.AnalyzePpgSample(prev, curr);
+            // Enqueue for background drain — WCF thread returns immediately
+            _analyticsQueue.Enqueue((prev, curr));
+        }
 
-            if (_receivedCount % 100 == 0)
+        private async Task DrainAnalyticsAsync(CancellationToken ct)
+        {
+            while (!ct.IsCancellationRequested)
             {
-                int count = _receivedCount;
-                SafeInvokeUIAsync(() =>
+                while (_analyticsQueue.TryDequeue(out var pair))
                 {
-                    IncomingRowsTB.Text = $"Received: {count}";
-                });
+                    int count = Interlocked.Increment(ref _receivedCount);
+                    _analytics.AnalyzePpgSample(pair.Prev, pair.Curr);
+
+                    if (count % 100 == 0)
+                        SafeInvokeUIAsync(() => IncomingRowsTB.Text = $"Received: {count}");
+                }
+                try { await Task.Delay(5, ct); }
+                catch (OperationCanceledException) { break; }
+            }
+
+            // Drain remaining after cancel
+            while (_analyticsQueue.TryDequeue(out var pair))
+            {
+                Interlocked.Increment(ref _receivedCount);
+                _analytics.AnalyzePpgSample(pair.Prev, pair.Curr);
             }
         }
 

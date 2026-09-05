@@ -176,6 +176,7 @@ namespace Wcf_Service_Project
                         LoadingDirPB.Value = 0;
                     });
 
+                    var uiSw = Stopwatch.StartNew();
                     while (_sendIndex < _totalSamples)
                     {
                         if (token.IsCancellationRequested) break;
@@ -192,17 +193,20 @@ namespace Wcf_Service_Project
 
                         _sendIndex += count;
 
-                        int sent = _sendIndex;
-                        int total = _totalSamples;
-                        int rejected = ExceptionHandling.TotalFaultCount;
-                        await SafeInvokeUIAsync(() =>
+                        // Throttle UI updates to avoid flooding dispatcher
+                        if (uiSw.ElapsedMilliseconds >= 200 || _sendIndex >= _totalSamples)
                         {
-                            RowNumInfoTB.Text = $"Sent: {sent} / {total}";
-                            ExceptionsTB.Text = $"Rejected: {rejected}";
-                            LoadingDirPB.Value = sent;
-                        });
-
-                        await Task.Delay(20);
+                            uiSw.Restart();
+                            int sent = _sendIndex;
+                            int total = _totalSamples;
+                            int rejected = ExceptionHandling.TotalFaultCount;
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                RowNumInfoTB.Text = $"Sent: {sent} / {total}";
+                                ExceptionsTB.Text = $"Rejected: {rejected}";
+                                LoadingDirPB.Value = sent;
+                            }));
+                        }
                     }
 
                     try { _proxy?.EndSession(); }
